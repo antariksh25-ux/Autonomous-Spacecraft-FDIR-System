@@ -1,0 +1,5 @@
+# FDIR ingestion-first backend dependencies
+fastapi>=0.109.0
+uvicorn[standard]>=0.25.0
+pydantic>=2.6.0
+pyyaml>=6.0

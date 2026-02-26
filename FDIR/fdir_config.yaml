@@ -1,0 +1,116 @@
+# FDIR ingestion-first configuration
+
+sample_rate_hz: 2.0
+mission_phase: nominal
+
+# Detection tuning
+persistence_samples: 3
+cross_sensor_min: 2
+
+# Channel specs used for health monitoring + anomaly detection
+channels:
+  - name: voltage_1
+    unit: V
+    nominal_min: 26.0
+    nominal_max: 30.0
+    subsystem: power
+    risk: high
+  - name: voltage_2
+    unit: V
+    nominal_min: 26.0
+    nominal_max: 30.0
+    subsystem: power
+    risk: high
+  - name: current_1
+    unit: A
+    nominal_min: 0.0
+    nominal_max: 10.0
+    subsystem: power
+    risk: medium
+  - name: current_2
+    unit: A
+    nominal_min: 0.0
+    nominal_max: 10.0
+    subsystem: power
+    risk: medium
+
+  - name: temp_1
+    unit: C
+    nominal_min: -10.0
+    nominal_max: 55.0
+    subsystem: thermal
+    risk: high
+  - name: temp_2
+    unit: C
+    nominal_min: -10.0
+    nominal_max: 55.0
+    subsystem: thermal
+    risk: high
+  - name: temp_3
+    unit: C
+    nominal_min: -10.0
+    nominal_max: 55.0
+    subsystem: thermal
+    risk: high
+  - name: temp_4
+    unit: C
+    nominal_min: -10.0
+    nominal_max: 55.0
+    subsystem: thermal
+    risk: high
+
+  - name: gyro_x
+    unit: dps
+    nominal_min: -2.0
+    nominal_max: 2.0
+    subsystem: attitude
+    risk: high
+  - name: gyro_y
+    unit: dps
+    nominal_min: -2.0
+    nominal_max: 2.0
+    subsystem: attitude
+    risk: high
+  - name: gyro_z
+    unit: dps
+    nominal_min: -2.0
+    nominal_max: 2.0
+    subsystem: attitude
+    risk: high
+  - name: acc_x
+    unit: m/s2
+    nominal_min: -0.2
+    nominal_max: 0.2
+    subsystem: attitude
+    risk: medium
+  - name: acc_y
+    unit: m/s2
+    nominal_min: -0.2
+    nominal_max: 0.2
+    subsystem: attitude
+    risk: medium
+  - name: acc_z
+    unit: m/s2
+    nominal_min: -0.2
+    nominal_max: 0.2
+    subsystem: attitude
+    risk: medium
+
+  - name: signal_strength
+    unit: dB
+    nominal_min: -100.0
+    nominal_max: -50.0
+    subsystem: communication
+    risk: medium
+  - name: packet_loss
+    unit: '%'
+    nominal_min: 0.0
+    nominal_max: 2.0
+    subsystem: communication
+    risk: high
+  - name: latency
+    unit: ms
+    nominal_min: 0.0
+    nominal_max: 450.0
+    subsystem: communication
+    risk: medium
