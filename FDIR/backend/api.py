@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -12,6 +13,7 @@ from .fdir.config import load_config
 from .fdir.simulator import SpacecraftSimulator
 from .fdir.system import FDIRSystem
 from .fdir.types import TelemetrySample
+from .settings import load_settings
 
 
 class TelemetryIngestRequest(BaseModel):
@@ -58,24 +60,41 @@ class ConnectionManager:
                 for ws in dead:
                     self._clients.discard(ws)
 
+    async def count(self) -> int:
+        async with self._lock:
+            return len(self._clients)
+
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="FDIR Backend", version="2.0")
+    settings = load_settings()
+    app = FastAPI(title="FDIR Backend", version="2.1")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.allow_origins,
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    repo_root = Path(__file__).resolve().parents[2]
-    config = load_config(repo_root)
-    system = FDIRSystem(config=config, data_dir=repo_root / "FDIR" / "data")
+    fdir_root = Path(__file__).resolve().parents[1]
+    config = load_config(fdir_root)
+    system = FDIRSystem(config=config, data_dir=fdir_root / "data")
     ws_mgr = ConnectionManager()
 
-    simulator = SpacecraftSimulator(seed=7)
-    sim_running = True
+    web_concurrency = int(os.getenv("WEB_CONCURRENCY", "1") or "1")
+    simulation_enabled = bool(settings.simulation_enabled)
+    if simulation_enabled and web_concurrency > 1:
+        # Running simulation + sqlite in multiple worker processes will cause duplicate streams and DB contention.
+        simulation_enabled = False
+        system.add_log(
+            "warning",
+            "startup",
+            "Simulation disabled because WEB_CONCURRENCY > 1",
+            {"web_concurrency": web_concurrency},
+        )
+
+    simulator = SpacecraftSimulator(seed=settings.simulation_seed)
+    sim_running = bool(settings.simulation_autostart and simulation_enabled)
     sim_lock = asyncio.Lock()
     stop_event = asyncio.Event()
     sim_task: Optional[asyncio.Task] = None
@@ -102,6 +121,7 @@ def create_app() -> FastAPI:
 
     def _sim_status() -> Dict[str, Any]:
         return {
+            "enabled": bool(simulation_enabled),
             "running": bool(sim_running),
             "fault": simulator.fault_status(),
         }
@@ -110,7 +130,7 @@ def create_app() -> FastAPI:
         nonlocal sim_running
         dt = 1.0 / max(0.1, float(config.sample_rate_hz))
         while not stop_event.is_set():
-            if sim_running:
+            if simulation_enabled and sim_running:
                 async with sim_lock:
                     values = simulator.step(dt)
                 snap = system.ingest(TelemetrySample(timestamp_iso=SpacecraftSimulator.now_iso(), values=values))
@@ -118,9 +138,11 @@ def create_app() -> FastAPI:
             await asyncio.sleep(dt)
 
     async def _heartbeat_loop() -> None:
-        # When simulation is paused, keep UI alive with periodic snapshots.
+        # When simulation is paused/disabled, keep UI alive with periodic snapshots.
         while not stop_event.is_set():
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(1.0 / max(0.1, float(settings.broadcast_hz)))
+            if await ws_mgr.count() <= 0:
+                continue
             snap = system.snapshot(include_logs=False)
             ts = snap.get("telemetry_state") or {}
             total = int(ts.get("total_samples") or 0) if isinstance(ts, dict) else 0
@@ -130,7 +152,8 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def _startup() -> None:
         nonlocal sim_task, heartbeat_task
-        sim_task = asyncio.create_task(_sim_loop())
+        if simulation_enabled:
+            sim_task = asyncio.create_task(_sim_loop())
         heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
     @app.on_event("shutdown")
@@ -158,6 +181,16 @@ def create_app() -> FastAPI:
             ],
         }
 
+    @app.get("/healthz")
+    async def healthz() -> Dict[str, Any]:
+        return {"ok": True, "service": "fdir-backend", "version": app.version}
+
+    @app.get("/readyz")
+    async def readyz() -> Dict[str, Any]:
+        # Minimal readiness: process can create snapshots and access config.
+        _ = system.snapshot(include_logs=False)
+        return {"ok": True}
+
     @app.get("/api/status")
     async def get_status() -> Dict[str, Any]:
         snap = system.snapshot(include_logs=False)
@@ -177,29 +210,40 @@ def create_app() -> FastAPI:
     @app.post("/api/control/sim/start")
     async def sim_start() -> Dict[str, Any]:
         nonlocal sim_running
+        if not simulation_enabled:
+            return {"ok": False, "error": "simulation_disabled", "sim": _sim_status()}
         sim_running = True
         return {"ok": True, "sim": _sim_status()}
 
     @app.post("/api/control/sim/stop")
     async def sim_stop() -> Dict[str, Any]:
         nonlocal sim_running
+        if not simulation_enabled:
+            return {"ok": False, "error": "simulation_disabled", "sim": _sim_status()}
         sim_running = False
         return {"ok": True, "sim": _sim_status()}
 
     @app.post("/api/control/inject")
     async def inject_fault(req: InjectFaultRequest) -> Dict[str, Any]:
+        if not simulation_enabled:
+            return {"ok": False, "error": "simulation_disabled", "sim": _sim_status()}
         async with sim_lock:
             simulator.inject_fault(name=req.fault, magnitude=req.magnitude, duration_s=req.duration_s)
-        system._logs.add("warning", "inject", f"Injected fault: {req.fault}", {"magnitude": req.magnitude, "duration_s": req.duration_s})
-        system._persist_new_logs()
+        system.add_log(
+            "warning",
+            "inject",
+            f"Injected fault: {req.fault}",
+            {"magnitude": req.magnitude, "duration_s": req.duration_s},
+        )
         return {"ok": True, "sim": _sim_status()}
 
     @app.post("/api/control/inject/clear")
     async def clear_injection() -> Dict[str, Any]:
+        if not simulation_enabled:
+            return {"ok": False, "error": "simulation_disabled", "sim": _sim_status()}
         async with sim_lock:
             simulator.clear_fault()
-        system._logs.add("info", "inject", "Cleared injected fault")
-        system._persist_new_logs()
+        system.add_log("info", "inject", "Cleared injected fault")
         return {"ok": True, "sim": _sim_status()}
 
     @app.get("/api/faults")

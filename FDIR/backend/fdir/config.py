@@ -40,10 +40,10 @@ def _default_channels() -> List[ChannelSpec]:
     ]
 
 
-def load_config(repo_root: Path) -> FDIRConfig:
-    """Load config from `FDIR/fdir_config.yaml` if present, else use defaults."""
+def load_config(fdir_root: Path) -> FDIRConfig:
+    """Load config from `fdir_config.yaml` under the FDIR root, else use defaults."""
 
-    cfg_path = repo_root / "FDIR" / "fdir_config.yaml"
+    cfg_path = fdir_root / "fdir_config.yaml"
     if not cfg_path.exists():
         return FDIRConfig(
             sample_rate_hz=2.0,

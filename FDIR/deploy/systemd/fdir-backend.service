@@ -1,0 +1,46 @@
+[Unit]
+Description=FDIR Backend (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+
+# Create a dedicated user on the VM, e.g.:
+#   sudo useradd --system --create-home --shell /usr/sbin/nologin fdir
+User=fdir
+Group=fdir
+
+# IMPORTANT: set this to the absolute path of your deployed FDIR folder
+WorkingDirectory=/opt/fdir/FDIR
+
+# Environment configuration
+Environment=HOST=127.0.0.1
+Environment=PORT=8001
+Environment=LOG_LEVEL=info
+
+# Lock down CORS in production to your frontend domain
+# Example: Environment=FDIR_ALLOW_ORIGINS=https://dashboard.example.com
+Environment=FDIR_ALLOW_ORIGINS=https://YOUR_FRONTEND_DOMAIN
+
+# Recommended for production: ingestion-only mode
+Environment=FDIR_SIMULATION=0
+Environment=FDIR_SIM_AUTOSTART=0
+
+# SQLite-safe default
+Environment=WEB_CONCURRENCY=1
+
+# Optional tuning
+Environment=GUNICORN_TIMEOUT=60
+Environment=GUNICORN_KEEPALIVE=5
+
+# IMPORTANT: set this to your venv gunicorn path
+ExecStart=/opt/fdir/venv/bin/gunicorn -c backend/gunicorn_conf.py backend.api:app
+
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

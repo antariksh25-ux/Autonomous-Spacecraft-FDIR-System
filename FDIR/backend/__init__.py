@@ -1,7 +1,9 @@
 """FDIR backend package.
 
-This backend is ingestion-first:
-- It does not generate telemetry.
-- It processes telemetry samples pushed in via REST.
-- It streams computed system snapshots via WebSocket.
+This backend supports both:
+
+- Simulation-first synthetic telemetry (optional)
+- Ingestion of real telemetry via REST
+
+It streams computed system snapshots via WebSocket.
 """

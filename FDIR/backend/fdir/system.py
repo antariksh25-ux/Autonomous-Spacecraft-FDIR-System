@@ -52,6 +52,10 @@ class FDIRSystem:
     def log_seq(self) -> int:
         return self._logs.seq
 
+    def add_log(self, level: str, stage: str, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        self._logs.add(level, stage, message, details or {})
+        self._persist_new_logs()
+
     def ingest(self, sample: TelemetrySample) -> Dict[str, Any]:
         if self.mode == SystemMode.hold:
             self._logs.add("warning", "ingest", "System in HOLD; telemetry ingested but actions suppressed")

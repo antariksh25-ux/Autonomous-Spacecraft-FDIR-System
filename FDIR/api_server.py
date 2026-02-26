@@ -1,27 +1,28 @@
 """FDIR backend entrypoint.
 
-This server is ingestion-first (no telemetry generation).
+Default behavior is simulation-first (synthetic telemetry generator) with optional fault injection.
+You can disable simulation for production ingestion-only mode via env vars.
 
 Endpoints:
-- REST: http://localhost:8001/api/*
-- WebSocket: ws://localhost:8001/ws
-
-Ingest telemetry via:
-- POST /api/telemetry
-- POST /api/telemetry/batch
+- REST: http://<host>:<port>/api/*
+- Health: http://<host>:<port>/healthz and /readyz
+- WebSocket: ws://<host>:<port>/ws
 """
 
 from __future__ import annotations
 
 import uvicorn
 
+from backend.settings import load_settings
+
 def main() -> None:
+    settings = load_settings()
     uvicorn.run(
         "backend.api:app",
-        host="0.0.0.0",
-        port=8001,
+        host=settings.host,
+        port=settings.port,
         reload=False,
-        log_level="info",
+        log_level=settings.log_level,
     )
 
 if __name__ == "__main__":
