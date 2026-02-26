@@ -1,5 +1,5 @@
 # FDIR Backend API Server Startup Script
-# Starts the FastAPI backend on port 8001
+# Starts the Autonomous-Spacecraft-FDIR-System backend on port 8001
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Starting FDIR Backend API Server" -ForegroundColor Cyan
@@ -9,8 +9,9 @@ Write-Host "Backend will run on: http://localhost:8001" -ForegroundColor Green
 Write-Host "API Docs: http://localhost:8001/docs" -ForegroundColor Green
 Write-Host ""
 
-# Change to script directory
-Set-Location $PSScriptRoot
+# Change to backend directory
+$BackendDir = Join-Path $PSScriptRoot "Autonomous-Spacecraft-FDIR-System"
+Set-Location $BackendDir
 
 # Check if virtual environment exists
 if (Test-Path ".venv\Scripts\Activate.ps1") {
@@ -19,6 +20,9 @@ if (Test-Path ".venv\Scripts\Activate.ps1") {
 } elseif (Test-Path "..\.venv\Scripts\Activate.ps1") {
     Write-Host "Activating parent virtual environment..." -ForegroundColor Yellow
     & ..\.venv\Scripts\Activate.ps1
+} elseif (Test-Path "..\..\.venv\Scripts\Activate.ps1") {
+    Write-Host "Activating workspace virtual environment..." -ForegroundColor Yellow
+    & ..\..\.venv\Scripts\Activate.ps1
 } else {
     Write-Host "No virtual environment found, using system Python" -ForegroundColor Yellow
 }
@@ -32,7 +36,7 @@ try {
 } catch {
     Write-Host ""
     Write-Host "Installing dependencies..." -ForegroundColor Yellow
-    pip install -r requirements.txt
+    pip install -r (Join-Path $PSScriptRoot "requirements.txt")
 }
 
 Write-Host ""
@@ -40,4 +44,4 @@ Write-Host "Starting FDIR API server..." -ForegroundColor Green
 Write-Host "Press Ctrl+C to stop" -ForegroundColor Gray
 Write-Host ""
 
-python api_server.py
+python main.py

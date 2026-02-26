@@ -7,7 +7,7 @@ echo Backend will run on: http://localhost:8001
 echo API Docs: http://localhost:8001/docs
 echo.
 
-cd /d "%~dp0"
+cd /d "%~dp0\Autonomous-Spacecraft-FDIR-System"
 
 REM Check if virtual environment exists
 if exist ".venv\Scripts\activate.bat" (
@@ -16,6 +16,9 @@ if exist ".venv\Scripts\activate.bat" (
 ) else if exist "..\.venv\Scripts\activate.bat" (
     echo Activating parent virtual environment...
     call ..\.venv\Scripts\activate.bat
+) else if exist "..\..\.venv\Scripts\activate.bat" (
+    echo Activating workspace virtual environment...
+    call ..\..\.venv\Scripts\activate.bat
 ) else (
     echo No virtual environment found, using system Python
 )
@@ -25,11 +28,11 @@ python -c "import fastapi" 2>nul
 if errorlevel 1 (
     echo.
     echo Installing dependencies...
-    pip install -r requirements.txt
+    pip install -r ..\requirements.txt
 )
 
 echo.
 echo Starting FDIR API server...
-python api_server.py
+python main.py
 
 pause

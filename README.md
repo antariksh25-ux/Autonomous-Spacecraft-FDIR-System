@@ -1,3 +1,10 @@
+# FDIR System
+
+This repository contains the Fault Detection, Isolation, and Recovery (FDIR) backend + dashboard.
+
+See:
+
+- [FDIR/README.md](FDIR/README.md)
 # 🛡️ Advanced Disaster Response Decision-Support System (DSS)
 
 > **Enterprise-grade, explainable, human-in-the-loop disaster response system**  
@@ -16,6 +23,19 @@ This system demonstrates **advanced decision-support architecture** for disaster
 - **Immutable audit trail** for full traceability
 
 **This is NOT production software** — uses mock data only for academic demonstration.
+
+---
+
+## Spacecraft FDIR Demo (Deterministic)
+
+This repo also contains a deterministic spacecraft **Autonomous FDIR** demo with an ethical autonomy gate.
+
+Run from repo root:
+
+- Backend: `python main.py` (FastAPI on `http://localhost:8001`, WebSocket at `/ws`)
+- Frontend: `npm install` then `npm run dev` (Next.js on `http://localhost:3000`)
+
+See [FDIR/README.md](FDIR/README.md) for details.
 
 ---
 

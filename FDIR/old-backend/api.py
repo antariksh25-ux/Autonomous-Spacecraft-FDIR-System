@@ -31,6 +31,11 @@ class InjectFaultRequest(BaseModel):
     duration_s: float = Field(12.0, description="How long the fault persists")
 
 
+class OperatorMessageRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=5000)
+    channel: str = Field("ops", description="Optional routing label (ops/comm/power/etc)")
+
+
 class ConnectionManager:
     def __init__(self) -> None:
         self._clients: set[WebSocket] = set()
@@ -257,6 +262,16 @@ def create_app() -> FastAPI:
     @app.post("/api/control/reset")
     async def reset() -> Dict[str, Any]:
         return system.reset()
+
+    @app.post("/api/control/operator/message")
+    async def operator_message(req: OperatorMessageRequest) -> Dict[str, Any]:
+        system.add_log(
+            "info",
+            "operator",
+            req.message,
+            {"channel": req.channel},
+        )
+        return {"ok": True}
 
     @app.post("/api/telemetry")
     async def ingest_telemetry(req: TelemetryIngestRequest) -> Dict[str, Any]:

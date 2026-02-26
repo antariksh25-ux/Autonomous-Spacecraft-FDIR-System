@@ -148,6 +148,16 @@ class FDIRApiClient {
     return response.json()
   }
 
+  async sendOperatorMessage(message: string, channel: string = 'ops'): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/api/control/operator/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, channel }),
+    })
+    if (!response.ok) throw new Error('Failed to send operator message')
+    return response.json()
+  }
+
   async simStart(): Promise<any> {
     const response = await fetch(`${this.baseUrl}/api/control/sim/start`, {
       method: 'POST',
