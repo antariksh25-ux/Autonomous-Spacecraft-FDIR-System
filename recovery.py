@@ -20,6 +20,7 @@ Implements §5.5 Graceful Degradation strategy:
 
 from dataclasses import dataclass
 from typing import Optional
+from subsystems.base import FaultDiagnosis
 from ethical_engine import AutonomyDecision, EthicalDecisionResult
 
 
@@ -59,11 +60,27 @@ RECOVERY_ACTIONS = {
         ],
     },
     "thermal_throttle": {
-        "category":     "LIMITED",
-        "description":  "Regulator clock speed throttled. High-power operations suspended.",
+        "category":     "PRIMARY",
+        "description":  "High-power operations suspended. Processing load reduced to lower thermal output.",
         "side_effects": [
             "Processing throughput reduced (~40%)",
             "Active thermal management engaged",
+        ],
+    },
+    "switch_to_backup_heater": {
+        "category":     "PRIMARY",
+        "description":  "Primary heater isolated. Backup heater activated to restore thermal control.",
+        "side_effects": [
+            "Backup heater now active — reduced thermal margin",
+            "Primary heater isolated pending review",
+        ],
+    },
+    "activate_emergency_radiator": {
+        "category":     "PRIMARY",
+        "description":  "Emergency radiator panels deployed for additional heat rejection.",
+        "side_effects": [
+            "Emergency radiator active — increased power draw",
+            "Spacecraft attitude constraints may apply",
         ],
     },
     "safe_mode": {
@@ -85,16 +102,17 @@ RECOVERY_ACTIONS = {
 
 class RecoveryModule:
 
-    def __init__(self, simulator):
-        self.simulator        = simulator
+    def __init__(self, simulators: dict):
+        """Accept a dict of simulators keyed by subsystem name."""
+        self.simulators       = simulators   # {"power": PowerSim, "thermal": ThermalSim, ...}
         self.recovery_history = []
         self.safe_mode_active = False
         self.is_recovering    = False
 
-    def execute(self, ethical_decision: EthicalDecisionResult) -> RecoveryResult:
+    def execute(self, ethical_decision: EthicalDecisionResult, subsystem: str) -> RecoveryResult:
         """
         Execute the action permitted by the ethical engine.
-        This is the ONLY entry point for recovery actions — ethical_decision is the auth token.
+        Routes recovery to the correct subsystem's simulator.
         """
         action = ethical_decision.permitted_action
         if action not in RECOVERY_ACTIONS:
@@ -112,7 +130,9 @@ class RecoveryModule:
         )
 
         if action != "none":
-            self.simulator.apply_recovery(action)
+            simulator = self.simulators.get(subsystem)
+            if simulator:
+                simulator.apply_recovery(action)
             self.is_recovering = True
             if action == "safe_mode":
                 self.safe_mode_active = True
@@ -123,10 +143,10 @@ class RecoveryModule:
     def trigger_safe_mode(self) -> RecoveryResult:
         """
         §5.5 Last resort — called by main loop if system remains CRITICAL
-        after a recovery attempt. This makes safe_mode reachable from the
-        normal FDIR path (gap from original code).
+        after a recovery attempt.  Applies safe_mode across ALL subsystems.
         """
-        self.simulator.apply_recovery("safe_mode")
+        for sim in self.simulators.values():
+            sim.apply_recovery("safe_mode")
         self.safe_mode_active = True
         action_def = RECOVERY_ACTIONS["safe_mode"]
         result = RecoveryResult(
@@ -144,6 +164,7 @@ class RecoveryModule:
         self.recovery_history = []
         self.safe_mode_active = False
         self.is_recovering    = False
+        # Note: simulators are reset separately by main loop
 
     def to_dict(self, result: RecoveryResult) -> dict:
         return {
