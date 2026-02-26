@@ -1,6 +1,7 @@
-node_modules/
+﻿node_modules/
 __pycache__/
 *.pyc
+*.pyo
 .DS_Store
 .env
 .vscode/
@@ -19,4 +20,3 @@ coverage/
 *.egg
 *.zip
 *.tar.gz
-*.log

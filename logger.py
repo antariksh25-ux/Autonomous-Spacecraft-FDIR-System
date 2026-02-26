@@ -84,61 +84,101 @@ class FDIRLogger:
     # PUBLIC LOGGING METHODS
     # ─────────────────────────────────────────────
 
-    def log_system_start(self, mission_phase: str):
+    def log_system_start(self, mission_phase: str, subsystems: list = None):
+        subs = subsystems or ["power"]
+        subs_str = ", ".join(s.upper() for s in subs)
         print(f"\n{Color.BOLD}{Color.CYAN}{'='*65}{Color.RESET}")
-        print(f"{Color.BOLD}{Color.CYAN}  FDIR POWER SUBSYSTEM — ONLINE{Color.RESET}")
+        print(f"{Color.BOLD}{Color.CYAN}  FDIR SYSTEM — ONLINE{Color.RESET}")
+        print(f"{Color.CYAN}  Subsystems: {subs_str}{Color.RESET}")
         print(f"{Color.CYAN}  Pipeline: Sensor→Monitor→Isolator→Ethics→Recovery{Color.RESET}")
         print(f"{Color.CYAN}  Mission Phase: {mission_phase}{Color.RESET}")
         print(f"{Color.CYAN}{'='*65}{Color.RESET}\n")
         self._add_event(EventType.SYSTEM_START, {
             "message":      "FDIR system initialized",
             "mission_phase": mission_phase,
+            "subsystems":    subs,
         }, tick=0)
 
     def log_system_reset(self):
         print(f"\n{Color.CYAN}[RESET] System reset to nominal state{Color.RESET}\n")
         self._add_event(EventType.SYSTEM_RESET, {"message": "System reset"}, tick=0)
 
-    def log_sensor_data(self, tick: int, sensor_data: dict):
-        self.tick_count = tick
-        backup_tag = f"  {Color.CYAN}[BACKUP ACTIVE]{Color.RESET}" if sensor_data.get("backup_active") else ""
-        print(
-            f"{Color.DIM}[T{tick:03d}]{Color.RESET} "
-            f"V:{sensor_data['voltage']:5.1f} | "
-            f"I:{sensor_data['current']:5.1f} | "
-            f"SoC:{sensor_data['soc']:5.1f} | "
-            f"T:{sensor_data['temperature']:5.1f}"
-            + backup_tag
-        )
-        self._add_event(EventType.SENSOR_DATA, sensor_data, tick=tick)
+    def log_sensor_data(self, tick: int, all_sensor_data: dict):
+        """Log sensor readings for all subsystems.
 
-    def log_temporary_anomaly(self, tick: int, health_report: dict):
+        Accepts either:
+          - dict keyed by subsystem name (multi-subsystem mode)
+          - flat dict with sensor keys (legacy single-subsystem mode)
+        """
+        self.tick_count = tick
+
+        # Detect format: multi-subsystem has nested dicts
+        if "power" in all_sensor_data or "thermal" in all_sensor_data:
+            lines = []
+            if "power" in all_sensor_data:
+                d = all_sensor_data["power"]
+                bk = f"  {Color.CYAN}[BACKUP]{Color.RESET}" if d.get("backup_active") else ""
+                lines.append(
+                    f"{Color.DIM}[T{tick:03d}]{Color.RESET} "
+                    f"PWR  V:{d['voltage']:5.1f} | I:{d['current']:5.1f} | "
+                    f"SoC:{d['soc']:5.1f} | T:{d['temperature']:5.1f}{bk}"
+                )
+            if "thermal" in all_sensor_data:
+                d = all_sensor_data["thermal"]
+                bk = f"  {Color.CYAN}[BKUP HTR]{Color.RESET}" if d.get("backup_heater_active") else ""
+                lines.append(
+                    f"       THRM Int:{d['internal_temp']:5.1f} | "
+                    f"Rad:{d['radiator_temp']:5.1f} | "
+                    f"Htr:{d['heater_power']:5.1f} | "
+                    f"Pnl:{d['panel_temp']:5.1f}{bk}"
+                )
+            for line in lines:
+                print(line)
+        else:
+            # Legacy single-subsystem format
+            backup_tag = f"  {Color.CYAN}[BACKUP ACTIVE]{Color.RESET}" if all_sensor_data.get("backup_active") else ""
+            print(
+                f"{Color.DIM}[T{tick:03d}]{Color.RESET} "
+                f"V:{all_sensor_data['voltage']:5.1f} | "
+                f"I:{all_sensor_data['current']:5.1f} | "
+                f"SoC:{all_sensor_data['soc']:5.1f} | "
+                f"T:{all_sensor_data['temperature']:5.1f}"
+                + backup_tag
+            )
+        self._add_event(EventType.SENSOR_DATA, all_sensor_data, tick=tick)
+
+    def log_temporary_anomaly(self, tick: int, subsystem: str, health_report: dict):
         """§5.2: Log temporary anomaly as distinct state (not yet a confirmed fault)."""
         temp = health_report["temporary_anomalies"]
+        tag = subsystem.upper()
         print(
-            f"{Color.DIM}[T{tick:03d}] ~ TEMPORARY ANOMALY{Color.RESET} "
+            f"{Color.DIM}[T{tick:03d}] [{tag}] ~ TEMPORARY ANOMALY{Color.RESET} "
             f"→ {temp} | Monitoring... (not yet confirmed fault)"
         )
         self._add_event(EventType.TEMPORARY_ANOMALY, {
+            "subsystem": subsystem,
             "temporary_anomalies": temp,
             "note": "Deviation detected but within noise/persistence window — not a confirmed fault",
         }, tick=tick)
 
-    def log_anomaly(self, tick: int, health_report: dict, state_snapshot: dict = None):
+    def log_anomaly(self, tick: int, subsystem: str, health_report: dict, state_snapshot: dict = None):
         anomalies = health_report["confirmed_anomalies"]
+        tag = subsystem.upper()
         print(
-            f"\n{Color.YELLOW}[T{tick:03d}] ⚠  ANOMALY CONFIRMED{Color.RESET} "
+            f"\n{Color.YELLOW}[T{tick:03d}] [{tag}] \u26a0  ANOMALY CONFIRMED{Color.RESET} "
             f"→ Parameters: {anomalies} | Status: {health_report['overall_status']}"
         )
         self._add_event(EventType.ANOMALY_DETECTED, {
+            "subsystem":           subsystem,
             "confirmed_anomalies": anomalies,
             "overall_status":      health_report["overall_status"],
             "parameters":          {k: v["status"] for k, v in health_report["parameters"].items()},
         }, tick=tick, state_snapshot=state_snapshot)
 
-    def log_fault_isolation(self, tick: int, diagnosis_dict: dict, state_snapshot: dict = None):
+    def log_fault_isolation(self, tick: int, subsystem: str, diagnosis_dict: dict, state_snapshot: dict = None):
+        tag = subsystem.upper()
         print(
-            f"{Color.RED}[T{tick:03d}] 🔍 FAULT ISOLATED{Color.RESET}"
+            f"{Color.RED}[T{tick:03d}] [{tag}] \U0001f50d FAULT ISOLATED{Color.RESET}"
             f" → {diagnosis_dict['fault_type'].upper()} | "
             f"Confidence: {diagnosis_dict['confidence_pct']} | "
             f"Risk: {diagnosis_dict['risk_level']} | "
@@ -162,14 +202,16 @@ class FDIRLogger:
         print(f"         {ethical_dict['reasoning']}")
         self._add_event(EventType.ETHICAL_DECISION, ethical_dict, tick=tick, state_snapshot=state_snapshot)
 
-    def log_recovery(self, tick: int, recovery_dict: dict, state_snapshot: dict = None):
+    def log_recovery(self, tick: int, subsystem: str, recovery_dict: dict, state_snapshot: dict = None):
+        tag = subsystem.upper()
         print(
-            f"{Color.GREEN}[T{tick:03d}] ✅ RECOVERY EXECUTED{Color.RESET}"
-            f" → {recovery_dict['action_taken']} | {recovery_dict['description']}"
+            f"{Color.GREEN}[T{tick:03d}] [{tag}] \u2705 RECOVERY EXECUTED{Color.RESET}"
+            f" \u2192 {recovery_dict['action_taken']} | {recovery_dict['description']}"
         )
         if recovery_dict["side_effects"]:
             print(f"         Side effects: {' | '.join(recovery_dict['side_effects'])}")
-        self._add_event(EventType.RECOVERY_ACTION, recovery_dict, tick=tick, state_snapshot=state_snapshot)
+        recovery_dict_with_sub = {**recovery_dict, "subsystem": subsystem}
+        self._add_event(EventType.RECOVERY_ACTION, recovery_dict_with_sub, tick=tick, state_snapshot=state_snapshot)
 
     def log_human_escalation(self, tick: int, message: str, state_snapshot: dict = None):
         print(f"\n{Color.MAGENTA}[T{tick:03d}] 🚨 HUMAN ESCALATION — AUTONOMOUS ACTION BLOCKED{Color.RESET}")
@@ -183,16 +225,19 @@ class FDIRLogger:
             "approved_action": approved_action,
         }, tick=tick)
 
-    def log_fault_injected(self, tick: int, fault_config: dict):
-        print(f"\n{Color.RED}{'─'*60}{Color.RESET}")
-        print(f"{Color.RED}[T{tick:03d}] 💥 FAULT INJECTED: {fault_config['type'].upper()}{Color.RESET}")
+    def log_fault_injected(self, tick: int, subsystem: str, fault_config: dict):
+        tag = subsystem.upper()
+        line = '\u2500' * 60
+        print(f"\n{Color.RED}{line}{Color.RESET}")
+        print(f"{Color.RED}[T{tick:03d}] [{tag}] \U0001f4a5 FAULT INJECTED: {fault_config['type'].upper()}{Color.RESET}")
         print(f"         {fault_config['description']}")
-        print(f"{Color.RED}{'─'*60}{Color.RESET}")
-        self._add_event(EventType.FAULT_INJECTED, fault_config, tick=tick)
+        print(f"{Color.RED}{line}{Color.RESET}")
+        self._add_event(EventType.FAULT_INJECTED, {**fault_config, "subsystem": subsystem}, tick=tick)
 
-    def log_recovery_in_progress(self, tick: int, fault_type: str):
+    def log_recovery_in_progress(self, tick: int, subsystem: str, fault_type: str):
         """Printed once after recovery while sensor values are still catching up."""
-        print(f"{Color.DIM}[T{tick:03d}] ↻ Recovery in progress for '{fault_type}' — sensor values returning to nominal{Color.RESET}")
+        tag = subsystem.upper()
+        print(f"{Color.DIM}[T{tick:03d}] [{tag}] \u21bb Recovery in progress for '{fault_type}' \u2014 sensor values returning to nominal{Color.RESET}")
 
     def log_safe_mode(self, tick: int, reason: str):
         print(f"\n{Color.RED}[T{tick:03d}] 🛡  SAFE MODE ENGAGED — {reason}{Color.RESET}")

@@ -36,7 +36,7 @@ Decision outcomes (§6.3 table):
 """
 
 from dataclasses import dataclass
-from fault_isolator import FaultDiagnosis
+from subsystems.base import FaultDiagnosis
 import config as _cfg   # import module (not values) so mission phase is read dynamically each call
 
 ETHICAL = _cfg.ETHICAL
@@ -53,15 +53,21 @@ REVERSIBILITY_SCORE = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
 
 # Fallback (safe) actions for when full recommended action is not authorized
 LIMITED_ACTION_MAP = {
-    "voltage_drop":     "reduce_load",
-    "overcurrent":      "reduce_load",
-    "battery_drain":    "reduce_load",
-    "thermal_overload": "thermal_throttle",
+    # Power subsystem
+    "voltage_drop":        "reduce_load",
+    "overcurrent":         "reduce_load",
+    "battery_drain":       "reduce_load",
+    "thermal_overload":    "thermal_throttle",
+    # Thermal subsystem
+    "thermal_runaway":     "reduce_load",
+    "heater_failure":      "reduce_load",
+    "radiator_degradation": "reduce_load",
 }
 
 
 @dataclass
 class EthicalDecisionResult:
+    subsystem:           str    # source subsystem (pass-through from diagnosis)
     autonomy_level:      str
     permitted_action:    str
     confidence:          float
@@ -232,6 +238,7 @@ class EthicalEngine:
             )
 
         result = EthicalDecisionResult(
+            subsystem           = diagnosis.subsystem,
             autonomy_level      = autonomy_level,
             permitted_action    = permitted_action,
             confidence          = confidence,
@@ -249,6 +256,7 @@ class EthicalEngine:
 
     def to_dict(self, result: EthicalDecisionResult) -> dict:
         return {
+            "subsystem":           result.subsystem,
             "autonomy_level":      result.autonomy_level,
             "permitted_action":    result.permitted_action,
             "confidence":          result.confidence,
