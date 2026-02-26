@@ -1,0 +1,403 @@
+[
+  {
+    "timestamp": "2026-02-26T12:34:53.228915Z",
+    "tick": 0,
+    "event_type": "SYSTEM_START",
+    "data": {
+      "message": "FDIR system initialized",
+      "mission_phase": "NOMINAL_OPS"
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:54.231143Z",
+    "tick": 1,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 60.36,
+      "current": 35.2,
+      "soc": 79.77,
+      "temperature": 35.25,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:55.234539Z",
+    "tick": 2,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 59.25,
+      "current": 36.22,
+      "soc": 80.44,
+      "temperature": 34.92,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:56.237829Z",
+    "tick": 3,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 60.43,
+      "current": 36.49,
+      "soc": 79.57,
+      "temperature": 35.27,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:57.244699Z",
+    "tick": 4,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 57.45,
+      "current": 34.15,
+      "soc": 79.63,
+      "temperature": 35.67,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:58.249988Z",
+    "tick": 5,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 60.17,
+      "current": 33.49,
+      "soc": 80.44,
+      "temperature": 35.38,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:59.254399Z",
+    "tick": 6,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 58.61,
+      "current": 35.48,
+      "soc": 80.26,
+      "temperature": 35.48,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:34:59.255419Z",
+    "tick": 6,
+    "event_type": "SYSTEM_NOMINAL",
+    "data": {
+      "message": "All parameters nominal"
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:00.257572Z",
+    "tick": 7,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 59.47,
+      "current": 34.8,
+      "soc": 79.95,
+      "temperature": 35.69,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:01.263537Z",
+    "tick": 8,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 60.37,
+      "current": 34.44,
+      "soc": 79.57,
+      "temperature": 35.02,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:02.270178Z",
+    "tick": 9,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 61.15,
+      "current": 33.88,
+      "soc": 79.15,
+      "temperature": 35.79,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:03.276266Z",
+    "tick": 10,
+    "event_type": "FAULT_INJECTED",
+    "data": {
+      "tick": 10,
+      "type": "voltage_drop",
+      "severity": "gradual",
+      "description": "Primary regulator partial failure \u2014 voltage declining",
+      "target_value": 30
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:03.278275Z",
+    "tick": 10,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 52.47,
+      "current": 33.95,
+      "soc": 80.31,
+      "temperature": 34.44,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:04.281883Z",
+    "tick": 11,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 46.86,
+      "current": 34.24,
+      "soc": 79.92,
+      "temperature": 34.37,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:04.286912Z",
+    "tick": 11,
+    "event_type": "TEMPORARY_ANOMALY",
+    "data": {
+      "temporary_anomalies": [
+        "voltage"
+      ],
+      "note": "Deviation detected but within noise/persistence window \u2014 not a confirmed fault"
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:05.290816Z",
+    "tick": 12,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 39.41,
+      "current": 34.69,
+      "soc": 79.16,
+      "temperature": 35.16,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:05.295852Z",
+    "tick": 12,
+    "event_type": "TEMPORARY_ANOMALY",
+    "data": {
+      "temporary_anomalies": [
+        "voltage"
+      ],
+      "note": "Deviation detected but within noise/persistence window \u2014 not a confirmed fault"
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:06.299923Z",
+    "tick": 13,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 36.86,
+      "current": 34.7,
+      "soc": 80.2,
+      "temperature": 34.68,
+      "backup_active": false
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:06.304433Z",
+    "tick": 13,
+    "event_type": "ANOMALY_DETECTED",
+    "data": {
+      "confirmed_anomalies": [
+        "voltage"
+      ],
+      "overall_status": "CRITICAL",
+      "parameters": {
+        "voltage": "CRITICAL",
+        "current": "NOMINAL",
+        "soc": "NOMINAL",
+        "temperature": "NOMINAL"
+      }
+    },
+    "state_snapshot": {
+      "sensor_data": {
+        "voltage": 36.86,
+        "current": 34.7,
+        "soc": 80.2,
+        "temperature": 34.68,
+        "backup_active": false
+      },
+      "overall_status": "CRITICAL",
+      "confirmed_anomalies": [
+        "voltage"
+      ],
+      "mission_phase": "NOMINAL_OPS"
+    }
+  },
+  {
+    "timestamp": "2026-02-26T12:35:06.306498Z",
+    "tick": 13,
+    "event_type": "FAULT_ISOLATED",
+    "data": {
+      "fault_type": "voltage_drop",
+      "affected_params": [
+        "voltage"
+      ],
+      "confidence": 0.88,
+      "confidence_pct": "88%",
+      "risk_level": "LOW",
+      "reversibility": "HIGH",
+      "description": "Primary power regulator voltage drop \u2014 likely regulator degradation or partial failure",
+      "recommended_action": "switch_to_backup_regulator",
+      "isolation_reasoning": "Primary 'voltage' anomaly confirmed (base confidence: 78%) | Primary parameter at CRITICAL severity (+10%)"
+    },
+    "state_snapshot": {
+      "sensor_data": {
+        "voltage": 36.86,
+        "current": 34.7,
+        "soc": 80.2,
+        "temperature": 34.68,
+        "backup_active": false
+      },
+      "overall_status": "CRITICAL",
+      "confirmed_anomalies": [
+        "voltage"
+      ],
+      "mission_phase": "NOMINAL_OPS"
+    }
+  },
+  {
+    "timestamp": "2026-02-26T12:35:06.309489Z",
+    "tick": 13,
+    "event_type": "ETHICAL_DECISION",
+    "data": {
+      "autonomy_level": "FULL_AUTONOMOUS",
+      "permitted_action": "switch_to_backup_regulator",
+      "confidence": 0.88,
+      "risk_level": "LOW",
+      "reversibility": "HIGH",
+      "mission_criticality": "LOW",
+      "mission_phase": "NOMINAL_OPS",
+      "reasoning": "FULL AUTONOMOUS RECOVERY AUTHORIZED. Confidence (88%) \u2265 high threshold (75%). Risk level: LOW (score: 1/3) \u2014 low risk action. Reversibility: HIGH \u2014 action is undoable if needed. Mission phase 'NOMINAL_OPS' (criticality: LOW) \u2014 autonomy permitted in this phase. All \u00a76.1 constraints satisfied. Action 'switch_to_backup_regulator' authorized for immediate execution.",
+      "human_message": "",
+      "requires_human_hold": false
+    },
+    "state_snapshot": {
+      "sensor_data": {
+        "voltage": 36.86,
+        "current": 34.7,
+        "soc": 80.2,
+        "temperature": 34.68,
+        "backup_active": false
+      },
+      "overall_status": "CRITICAL",
+      "confirmed_anomalies": [
+        "voltage"
+      ],
+      "mission_phase": "NOMINAL_OPS"
+    }
+  },
+  {
+    "timestamp": "2026-02-26T12:35:06.311492Z",
+    "tick": 13,
+    "event_type": "RECOVERY_ACTION",
+    "data": {
+      "action_taken": "switch_to_backup_regulator",
+      "action_category": "PRIMARY",
+      "success": true,
+      "description": "Switched primary power bus to backup regulator. Primary regulator isolated for review.",
+      "side_effects": [
+        "Backup regulator now active \u2014 reduced max power headroom (~15%)",
+        "Primary regulator isolated pending ground review"
+      ],
+      "authorized_by": "FULL_AUTONOMOUS"
+    },
+    "state_snapshot": {
+      "sensor_data": {
+        "voltage": 36.86,
+        "current": 34.7,
+        "soc": 80.2,
+        "temperature": 34.68,
+        "backup_active": false
+      },
+      "overall_status": "CRITICAL",
+      "confirmed_anomalies": [
+        "voltage"
+      ],
+      "mission_phase": "NOMINAL_OPS"
+    }
+  },
+  {
+    "timestamp": "2026-02-26T12:35:07.314560Z",
+    "tick": 14,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 38.87,
+      "current": 35.55,
+      "soc": 80.02,
+      "temperature": 35.02,
+      "backup_active": true
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:08.318264Z",
+    "tick": 15,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 42.84,
+      "current": 36.85,
+      "soc": 79.91,
+      "temperature": 35.43,
+      "backup_active": true
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:09.326833Z",
+    "tick": 16,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 44.9,
+      "current": 33.2,
+      "soc": 79.89,
+      "temperature": 35.05,
+      "backup_active": true
+    },
+    "state_snapshot": {}
+  },
+  {
+    "timestamp": "2026-02-26T12:35:10.334447Z",
+    "tick": 17,
+    "event_type": "SENSOR_DATA",
+    "data": {
+      "voltage": 45.81,
+      "current": 35.89,
+      "soc": 80.26,
+      "temperature": 34.7,
+      "backup_active": true
+    },
+    "state_snapshot": {}
+  }
+]
