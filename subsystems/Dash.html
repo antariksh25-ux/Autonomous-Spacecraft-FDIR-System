@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FDIR Ground Station — Command & Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;900&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1520;
+    --surface2:  #111e2e;
+    --border:    #1a3050;
+    --accent:    #00d4ff;
+    --accent2:   #00ff9d;
+    --warn:      #ffb300;
+    --danger:    #ff3d5a;
+    --success:   #00ff9d;
+    --text:      #c8dff0;
+    --text-dim:  #4a6880;
+    --glow:      0 0 12px rgba(0,212,255,0.3);
+    --glow2:     0 0 12px rgba(0,255,157,0.3);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(0,70,120,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.04) 0%, transparent 50%);
+  }
+
+  /* ── TITLEBAR ── */
+  #titlebar {
+    height: 36px;
+    background: #060a0e;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    user-select: none;
+  }
+  #titlebar-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .title-controls { display: flex; gap: 8px; align-items: center; }
+  .title-btn {
+    width: 28px; height: 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .title-btn:hover { background: var(--surface2); color: var(--text); }
+  .title-btn.close:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  /* ABOUT button */
+  #about-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 4px 12px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+  #about-btn:hover { background: rgba(0,212,255,0.1); box-shadow: var(--glow); }
+
+  /* STATUS STRIP */
+  #status-strip {
+    height: 28px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+  .status-item { display: flex; align-items: center; gap: 6px; }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  .dot-green  { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .dot-yellow { background: var(--warn);    box-shadow: 0 0 6px var(--warn); }
+  .dot-red    { background: var(--danger);  box-shadow: 0 0 6px var(--danger); }
+  .dot-blue   { background: var(--accent);  box-shadow: 0 0 6px var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .status-label { color: var(--text-dim); }
+  .status-val   { color: var(--text); }
+  #mission-clock {
+    margin-left: auto;
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  /* ── MAIN GRID ── */
+  #grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: 1fr 200px;
+    gap: 1px;
+    background: var(--border);
+    height: calc(100vh - 64px);
+  }
+  .panel {
+    background: var(--surface);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    height: 32px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .panel-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 1px 6px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 2px;
+    color: var(--accent);
+    margin-left: auto;
+  }
+  .panel-body { flex: 1; overflow: hidden; padding: 12px; }
+
+  /* ── MAIN SECTION (top-left) ── */
+  #main-panel { grid-column:1; grid-row:1; }
+  #main-panel .panel-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  /* Fault cards row */
+  #fault-cards {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+  }
+  .fault-card {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .fault-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+  .fault-card.autonomous::before { background: var(--accent2); }
+  .fault-card.limited::before    { background: var(--warn); }
+  .fault-card.escalated::before  { background: var(--danger); }
+  .fault-card.inactive::before   { background: var(--border); }
+  .fc-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .fc-fault {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .fc-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+  .col-auto    { color: var(--accent2); }
+  .col-limited { color: var(--warn); }
+  .col-esc     { color: var(--danger); }
+  .col-pending { color: var(--text-dim); }
+
+  /* Command center & telemetry in main */
+  #cmd-center {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+  }
+  .cmd-section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .cmd-group-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cmd-btn {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    text-align: left;
+    letter-spacing: 0.5px;
+  }
+  .cmd-btn:hover { background: rgba(0,212,255,0.08); border-color: var(--accent); color: var(--accent); }
+  .cmd-btn.danger:hover { background: rgba(255,61,90,0.1); border-color: var(--danger); color: var(--danger); }
+  .inject-btn:hover { background: rgba(255,61,90,0.08); border-color: rgba(255,61,90,0.5); color: var(--danger); }
+  .phase-btn.active-phase {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,212,255,0.1);
+    box-shadow: 0 0 8px rgba(0,212,255,0.2);
+  }
+  .cmd-btn.approve {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(0,255,157,0.05);
+    animation: glow-pulse 2s infinite;
+  }
+  @keyframes glow-pulse {
+    0%,100% { box-shadow: 0 0 0 rgba(0,255,157,0); }
+    50%      { box-shadow: 0 0 10px rgba(0,255,157,0.3); }
+  }
+
+  .phase-select {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+  }
+  .phase-select:focus { border-color: var(--accent); }
+
+  #telemetry-panel {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    padding: 10px;
+    overflow-y: auto;
+  }
+  .telem-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 60px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .telem-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .telem-bar-wrap {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .telem-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 0.4s ease;
+  }
+  .telem-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    text-align: right;
+  }
+
+  /* ── RIGHT COLUMN ── */
+  #right-col { grid-column:2; grid-row:1/3; display: flex; flex-direction: column; gap: 1px; background: var(--border); }
+  #analytics-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #log-panel       { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Analytics tabs */
+  #analytics-tabs {
+    display: flex;
+    padding: 6px 8px 0;
+    gap: 4px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .atab {
+    padding: 4px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 3px 3px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    color: var(--text-dim);
+    background: transparent;
+    transition: all 0.15s;
+  }
+  .atab.active {
+    color: var(--accent);
+    border-color: var(--border);
+    background: var(--surface);
+  }
+  #analytics-body {
+    flex: 1;
+    padding: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .chart-view { display: none; width: 100%; height: 100%; }
+  .chart-view.active { display: block; }
+  canvas { max-width: 100%; }
+
+  /* Log */
+  #log-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    line-height: 1.8;
+  }
+  #log-body::-webkit-scrollbar { width: 4px; }
+  #log-body::-webkit-scrollbar-track { background: transparent; }
+  #log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-line { display: flex; gap: 8px; padding: 1px 0; }
+  .log-tick { color: var(--text-dim); flex-shrink: 0; width: 42px; }
+  .log-msg  { flex: 1; word-break: break-word; }
+  .log-autonomous { color: var(--accent2); }
+  .log-limited    { color: var(--warn); }
+  .log-escalated  { color: var(--danger); }
+  .log-inject     { color: var(--accent); }
+  .log-nominal    { color: var(--text-dim); }
+  .log-recovery   { color: #8ecdf5; }
+  .log-temp       { color: #7a8fa0; }
+
+  /* ── BOTTOM SECTION (Another Section = Command History) ── */
+  #history-panel { grid-column:1; grid-row:2; }
+  #history-panel .panel-body {
+    overflow-x: auto;
+    padding: 8px 12px;
+  }
+  #history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+  #history-table th {
+    text-align: left;
+    padding: 4px 10px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 1px;
+    font-size: 9px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #history-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(26,48,80,0.4);
+    white-space: nowrap;
+  }
+  #history-table tr:hover td { background: rgba(0,212,255,0.03); }
+  .hist-auto    { color: var(--accent2); }
+  .hist-limited { color: var(--warn); }
+  .hist-esc     { color: var(--danger); }
+  .hist-pending { color: var(--text-dim); }
+
+  /* ── ABOUT POPUP ── */
+  #about-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  #about-overlay.open { display: block; }
+  #about-popup {
+    position: absolute;
+    top: 60px; left: 50%;
+    transform: translateX(-50%);
+    width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    box-shadow: 0 0 40px rgba(0,212,255,0.2), 0 20px 60px rgba(0,0,0,0.8);
+    pointer-events: all;
+    animation: popup-in 0.25s ease;
+    overflow: hidden;
+  }
+  @keyframes popup-in {
+    from { opacity:0; transform: translateX(-50%) translateY(-10px) scale(0.97); }
+    to   { opacity:1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+  #about-titlebar {
+    height: 32px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    cursor: move;
+  }
+  #about-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    flex: 1;
+  }
+  #about-close {
+    width: 22px; height: 18px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  #about-close:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+  #about-body { padding: 18px 20px; }
+  .about-row { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+  .about-key {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    width: 90px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .about-val {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .about-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+  .about-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    margin: 2px;
+  }
+
+  /* ── NOTIFICATION TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    z-index: 999;
+    max-width: 280px;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.toast-success { border-color: var(--accent2); color: var(--accent2); }
+  #toast.toast-warn    { border-color: var(--warn);    color: var(--warn); }
+  #toast.toast-danger  { border-color: var(--danger);  color: var(--danger); }
+
+  /* Scrollbar global */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Glitch anim for critical alerts */
+  @keyframes glitch {
+    0%,100%  { clip-path: inset(0 0 95% 0); transform: translate(-2px); }
+    25%      { clip-path: inset(20% 0 60% 0); transform: translate(2px); }
+    50%      { clip-path: inset(60% 0 20% 0); transform: translate(-1px); }
+    75%      { clip-path: inset(90% 0 0 0); transform: translate(1px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── TITLEBAR ── -->
+<div id="titlebar">
+  <button id="about-btn" onclick="toggleAbout()">ABOUT</button>
+  <div id="titlebar-center">FDIR GROUND STATION — COMMAND &amp; CONTROL</div>
+  <div class="title-controls">
+    <button class="title-btn">─</button>
+    <button class="title-btn">□</button>
+    <button class="title-btn close">✕</button>
+  </div>
+</div>
+
+<!-- ── STATUS STRIP ── -->
+<div id="status-strip">
+  <div class="status-item">
+    <div class="status-dot dot-green"></div>
+    <span class="status-label">FDIR</span>
+    <span class="status-val" id="ss-fdir">ONLINE</span>
+  </div>
+  <div class="status-item">
+    <div class="status-dot dot-blue" id="ss-phase-dot"></div>
+    <span class="status-label">PHASE</span>
+    <span class="status-val" id="ss-phase">NOMINAL_OPS</span>
+  </div>
+  <div class="status-item">
+    <div class="status-dot dot-green" id="ss-pwr-dot"></div>
+    <span class="status-label">PWR</span>
+    <span class="status-val" id="ss-pwr">NOMINAL</span>
+  </div>
+  <div class="status-item">
+    <div class="status-dot dot-green" id="ss-thr-dot"></div>
+    <span class="status-label">THRM</span>
+    <span class="status-val" id="ss-thr">NOMINAL</span>
+  </div>
+  <div class="status-item">
+    <div class="status-dot dot-green" id="ss-tick-dot"></div>
+    <span class="status-label">TICK</span>
+    <span class="status-val" id="ss-tick">—</span>
+  </div>
+  <div id="mission-clock" id="mission-clock">MET 00:00:00</div>
+</div>
+
+<!-- ── MAIN GRID ── -->
+<div id="grid">
+
+  <!-- MAIN SECTION -->
+  <div class="panel" id="main-panel">
+    <div class="panel-header">
+      <div class="panel-title">Main Section — Operations &amp; Telemetry</div>
+      <div class="panel-badge" id="active-fault-count">0 ACTIVE FAULTS</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- Fault status cards -->
+      <div id="fault-cards">
+        <div class="fault-card autonomous" id="fc1">
+          <div class="fc-label">Fault 1 — Power</div>
+          <div class="fc-fault">VOLTAGE DROP</div>
+          <div class="fc-status col-auto">✅ FULL_AUTONOMOUS — switch_to_backup_regulator</div>
+        </div>
+        <div class="fault-card autonomous" id="fc2">
+          <div class="fc-label">Fault 2 — Thermal</div>
+          <div class="fc-fault">HEATER FAILURE</div>
+          <div class="fc-status col-auto">✅ FULL_AUTONOMOUS — switch_to_backup_heater</div>
+        </div>
+        <div class="fault-card inactive" id="fc3">
+          <div class="fc-label">Fault 3 — Power</div>
+          <div class="fc-fault">OVERCURRENT</div>
+          <div class="fc-status col-pending">⏳ PENDING — T045</div>
+        </div>
+        <div class="fault-card inactive" id="fc4">
+          <div class="fc-label">Fault 4 — Power</div>
+          <div class="fc-fault">BATTERY DRAIN</div>
+          <div class="fc-status col-pending">⏳ PENDING — T050</div>
+        </div>
+        <div class="fault-card inactive" id="fc5">
+          <div class="fc-label">Fault 5 — Thermal</div>
+          <div class="fc-fault">THERMAL RUNAWAY</div>
+          <div class="fc-status col-pending">⏳ PENDING — T095</div>
+        </div>
+      </div>
+
+      <!-- Command center -->
+      <div id="cmd-center">
+        <div class="cmd-section-title">▸ GROUND COMMANDS</div>
+
+        <!-- Human Approval — dynamic, only shown when holds are active -->
+        <div id="approval-section" style="display:none">
+          <div class="cmd-group-label" style="color:var(--danger)">⚠ PENDING APPROVAL</div>
+          <div id="approval-btns" class="cmd-grid"></div>
+        </div>
+
+        <!-- Mission Phase -->
+        <div>
+          <div class="cmd-group-label">MISSION PHASE</div>
+          <div class="cmd-grid">
+            <button class="cmd-btn phase-btn" id="pb-NOMINAL_OPS"       onclick="sendPhaseChange('NOMINAL_OPS')">NOMINAL OPS</button>
+            <button class="cmd-btn phase-btn" id="pb-COMMS_BLACKOUT"    onclick="sendPhaseChange('COMMS_BLACKOUT')">COMMS BLACKOUT</button>
+            <button class="cmd-btn phase-btn" id="pb-CRITICAL_MANEUVER" onclick="sendPhaseChange('CRITICAL_MANEUVER')">CRIT MANEUVER</button>
+            <button class="cmd-btn phase-btn" id="pb-SAFE_MODE"         onclick="sendPhaseChange('SAFE_MODE')">SAFE MODE</button>
+          </div>
+        </div>
+
+        <!-- Power Fault Injection -->
+        <div>
+          <div class="cmd-group-label">INJECT — POWER</div>
+          <div class="cmd-grid">
+            <button class="cmd-btn inject-btn" onclick="injectFault('power','voltage_drop')">⚡ VOLTAGE DROP</button>
+            <button class="cmd-btn inject-btn" onclick="injectFault('power','overcurrent')">⚡ OVERCURRENT</button>
+            <button class="cmd-btn inject-btn" onclick="injectFault('power','battery_drain')">⚡ BATTERY DRAIN</button>
+            <button class="cmd-btn inject-btn" onclick="injectFault('power','thermal_overload')">⚡ THERM OVERLOAD</button>
+          </div>
+        </div>
+
+        <!-- Thermal Fault Injection -->
+        <div>
+          <div class="cmd-group-label">INJECT — THERMAL</div>
+          <div class="cmd-grid">
+            <button class="cmd-btn inject-btn" onclick="injectFault('thermal','thermal_runaway')">🌡 THERM RUNAWAY</button>
+            <button class="cmd-btn inject-btn" onclick="injectFault('thermal','heater_failure')">🌡 HEATER FAILURE</button>
+            <button class="cmd-btn inject-btn" onclick="injectFault('thermal','radiator_degradation')">🌡 RADIATOR DEGRAD</button>
+          </div>
+        </div>
+
+        <!-- System Commands -->
+        <div>
+          <div class="cmd-group-label">SYSTEM</div>
+          <div class="cmd-grid">
+            <button class="cmd-btn danger" onclick="sendReset()">⟳ FULL RESET</button>
+            <button class="cmd-btn" onclick="poll()">↻ REFRESH</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Live telemetry -->
+      <div id="telemetry-panel">
+        <div class="cmd-section-title">▸ LIVE TELEMETRY — POWER</div>
+        <div class="telem-row">
+          <span class="telem-label">VOLTAGE</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-v" style="width:80%;background:var(--accent)"></div></div>
+          <span class="telem-val" id="val-v" style="color:var(--accent)">60.0 V</span>
+        </div>
+        <div class="telem-row">
+          <span class="telem-label">CURRENT</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-i" style="width:45%;background:var(--accent2)"></div></div>
+          <span class="telem-val" id="val-i" style="color:var(--accent2)">35.0 A</span>
+        </div>
+        <div class="telem-row">
+          <span class="telem-label">SOC</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-s" style="width:80%;background:var(--warn)"></div></div>
+          <span class="telem-val" id="val-s" style="color:var(--warn)">80.0 %</span>
+        </div>
+        <div class="telem-row">
+          <span class="telem-label">TEMP (REG)</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-t" style="width:40%;background:#ff8c42"></div></div>
+          <span class="telem-val" id="val-t" style="color:#ff8c42">35.0 °C</span>
+        </div>
+        <div style="margin-top:8px" class="cmd-section-title">▸ LIVE TELEMETRY — THERMAL</div>
+        <div class="telem-row">
+          <span class="telem-label">INT TEMP</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-it" style="width:55%;background:var(--accent)"></div></div>
+          <span class="telem-val" id="val-it" style="color:var(--accent)">40.0 °C</span>
+        </div>
+        <div class="telem-row">
+          <span class="telem-label">RAD TEMP</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-rt" style="width:38%;background:var(--accent2)"></div></div>
+          <span class="telem-val" id="val-rt" style="color:var(--accent2)">22.0 °C</span>
+        </div>
+        <div class="telem-row">
+          <span class="telem-label">HEATER PWR</span>
+          <div class="telem-bar-wrap"><div class="telem-bar" id="bar-hp" style="width:50%;background:var(--warn)"></div></div>
+          <span class="telem-val" id="val-hp" style="color:var(--warn)">50.0 %</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div id="right-col">
+
+    <!-- DATA ANALYTICS -->
+    <div class="panel" id="analytics-panel">
+      <div class="panel-header">
+        <div class="panel-title">Data Analytics</div>
+      </div>
+      <div id="analytics-tabs">
+        <button class="atab active" onclick="showChart('bar')">BAR</button>
+        <button class="atab" onclick="showChart('pie')">PIE</button>
+        <button class="atab" onclick="showChart('hist')">HIST</button>
+        <button class="atab" onclick="showChart('line')">TREND</button>
+      </div>
+      <div id="analytics-body">
+        <div class="chart-view active" id="chart-bar"><canvas id="c-bar"></canvas></div>
+        <div class="chart-view" id="chart-pie"><canvas id="c-pie"></canvas></div>
+        <div class="chart-view" id="chart-hist"><canvas id="c-hist"></canvas></div>
+        <div class="chart-view" id="chart-line"><canvas id="c-line"></canvas></div>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="panel" id="log-panel">
+      <div class="panel-header">
+        <div class="panel-title">Event Log</div>
+        <div class="panel-badge" id="log-count">0 EVENTS</div>
+      </div>
+      <div id="log-body">
+        <div class="log-line log-nominal">
+          <span class="log-tick">T000</span>
+          <span class="log-msg">System initializing — awaiting telemetry from backend...</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HISTORY / ANOTHER SECTION -->
+  <div class="panel" id="history-panel">
+    <div class="panel-header">
+      <div class="panel-title">Command History &amp; Resolution Log</div>
+      <div class="panel-badge" id="hist-count">0 COMMANDS</div>
+    </div>
+    <div class="panel-body">
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>TICK</th>
+            <th>SUBSYSTEM</th>
+            <th>FAULT TYPE</th>
+            <th>CONFIDENCE</th>
+            <th>RISK</th>
+            <th>DECISION</th>
+            <th>ACTION TAKEN</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          <tr>
+            <td colspan="8" style="color:var(--text-dim);text-align:center;padding:16px">
+              Awaiting event data from backend...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end grid -->
+
+<!-- ── ABOUT POPUP ── -->
+<div id="about-overlay">
+  <div id="about-popup">
+    <div id="about-titlebar" onmousedown="startDrag(event)">
+      <span id="about-title">ABOUT — FDIR SYSTEM</span>
+      <button id="about-close" onclick="toggleAbout()">✕</button>
+    </div>
+    <div id="about-body">
+      <div class="about-row">
+        <span class="about-key">System</span>
+        <span class="about-val">Fault Detection, Isolation &amp; Recovery (FDIR)</span>
+      </div>
+      <div class="about-row">
+        <span class="about-key">Version</span>
+        <span class="about-val">v2.0.0 — Multi-Subsystem</span>
+      </div>
+      <div class="about-row">
+        <span class="about-key">Subsystems</span>
+        <span class="about-val">Power Subsystem &amp; Thermal Subsystem</span>
+      </div>
+      <div class="about-divider"></div>
+      <div class="about-row">
+        <span class="about-key">Pipeline</span>
+        <span class="about-val">Sensor → Monitor → Isolator → Ethical Gate → Recovery</span>
+      </div>
+      <div class="about-row">
+        <span class="about-key">§ Compliance</span>
+        <span class="about-val">§5.1–5.7, §6.1–6.5, §9.1, §10.1–10.5</span>
+      </div>
+      <div class="about-row">
+        <span class="about-key">Decisions</span>
+        <span class="about-val">
+          <span class="about-tag" style="border-color:var(--accent2);color:var(--accent2)">FULL_AUTONOMOUS</span>
+          <span class="about-tag" style="border-color:var(--warn);color:var(--warn)">LIMITED_ACTION</span>
+          <span class="about-tag" style="border-color:var(--danger);color:var(--danger)">HUMAN_ESCALATION</span>
+        </span>
+      </div>
+      <div class="about-divider"></div>
+      <div class="about-row">
+        <span class="about-key">Scenario</span>
+        <span class="about-val">5 faults — 2 autonomous, 1 limited, 2 ground escalated</span>
+      </div>
+      <div class="about-row">
+        <span class="about-key">API</span>
+        <span class="about-val" style="color:var(--text-dim)">http://localhost:8000 (FastAPI)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ──
+const API = 'http://localhost:8000';
+let pollInterval = null;
+let missionStart = Date.now();
+let chartInstances = {};
+let eventHistory = [];
+let commandHistory = [];
+let tickHistory = { voltage: [], current: [], soc: [], temp: [], ticks: [] };
+
+// ── CONNECTION STATE ──
+let _backendOnline = false;
+let _logUserScrolled = false;
+let _reconnectAttempts = 0;
+const MAX_HISTORY_POINTS = 60;
+
+// ── DYNAMIC APPROVAL BUTTONS ──
+let _lastHoldFaults = [];
+function updateApprovalSection(holdFaults) {
+  if (JSON.stringify(holdFaults) === JSON.stringify(_lastHoldFaults)) return;
+  _lastHoldFaults = holdFaults;
+  const section = document.getElementById('approval-section');
+  const btns = document.getElementById('approval-btns');
+  if (!holdFaults || holdFaults.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  btns.innerHTML = holdFaults.map(ft =>
+    `<button class="cmd-btn approve" onclick="sendApproval('${ft}')">▶ APPROVE ${ft}</button>`
+  ).join('');
+}
+
+// ── MISSION CLOCK ──
+function updateClock() {
+  const elapsed = Math.floor((Date.now() - missionStart) / 1000);
+  const h = String(Math.floor(elapsed/3600)).padStart(2,'0');
+  const m = String(Math.floor((elapsed%3600)/60)).padStart(2,'0');
+  const s = String(elapsed%60).padStart(2,'0');
+  document.getElementById('mission-clock').textContent = `MET ${h}:${m}:${s}`;
+}
+setInterval(updateClock, 1000);
+
+// ── TOAST ──
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' toast-'+type : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', 3000);
+}
+
+// ── ABOUT POPUP ──
+let aboutOpen = false;
+function toggleAbout() {
+  aboutOpen = !aboutOpen;
+  document.getElementById('about-overlay').className = aboutOpen ? 'open' : '';
+}
+
+// Draggable about popup
+let dragging = false, dx=0, dy=0;
+function startDrag(e) {
+  dragging = true;
+  const popup = document.getElementById('about-popup');
+  const rect = popup.getBoundingClientRect();
+  dx = e.clientX - rect.left;
+  dy = e.clientY - rect.top;
+  e.preventDefault();
+}
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const popup = document.getElementById('about-popup');
+  popup.style.left = (e.clientX - dx) + 'px';
+  popup.style.top  = (e.clientY - dy) + 'px';
+  popup.style.transform = 'none';
+});
+document.addEventListener('mouseup', () => dragging = false);
+
+// ── CHART TAB SWITCH ──
+function showChart(name) {
+  document.querySelectorAll('.chart-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.atab').forEach(b => b.classList.remove('active'));
+  document.getElementById('chart-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── CHART INIT ──
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#4a6880', font: { family: 'Share Tech Mono', size: 9 } } }
+  },
+  scales: {
+    x: { ticks: { color: '#4a6880', font:{family:'Share Tech Mono',size:9} }, grid: { color: 'rgba(26,48,80,0.5)' } },
+    y: { ticks: { color: '#4a6880', font:{family:'Share Tech Mono',size:9} }, grid: { color: 'rgba(26,48,80,0.5)' } },
+  }
+};
+
+function initCharts() {
+  // BAR — fault outcome summary
+  chartInstances.bar = new Chart(document.getElementById('c-bar'), {
+    type: 'bar',
+    data: {
+      labels: ['FULL_AUTO', 'LIMITED', 'ESCALATED', 'PENDING'],
+      datasets: [{
+        label: 'Fault Outcomes',
+        data: [0, 0, 0, 5],
+        backgroundColor: ['rgba(0,255,157,0.6)','rgba(255,179,0,0.6)','rgba(255,61,90,0.6)','rgba(74,104,128,0.4)'],
+        borderColor:      ['#00ff9d','#ffb300','#ff3d5a','#4a6880'],
+        borderWidth: 1
+      }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, title: { display: false } } }
+  });
+
+  // PIE — decision distribution
+  chartInstances.pie = new Chart(document.getElementById('c-pie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['FULL_AUTONOMOUS','LIMITED_ACTION','HUMAN_ESCALATION'],
+      datasets: [{
+        data: [0, 0, 0],
+        backgroundColor: ['rgba(0,255,157,0.7)','rgba(255,179,0,0.7)','rgba(255,61,90,0.7)'],
+        borderColor: ['#00ff9d','#ffb300','#ff3d5a'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#4a6880', font:{family:'Share Tech Mono',size:9}, padding:8 } }
+      }
+    }
+  });
+
+  // HISTOGRAM — confidence distribution
+  chartInstances.hist = new Chart(document.getElementById('c-hist'), {
+    type: 'bar',
+    data: {
+      labels: ['45–55%','55–65%','65–75%','75–85%','85–95%'],
+      datasets: [{
+        label: 'Confidence Distribution',
+        data: [0,0,0,0,0],
+        backgroundColor: 'rgba(0,212,255,0.5)',
+        borderColor: '#00d4ff',
+        borderWidth: 1
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+
+  // LINE — voltage trend
+  chartInstances.line = new Chart(document.getElementById('c-line'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'Voltage', data:[], borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,0.05)', borderWidth:1.5, pointRadius:0, tension:0.3 },
+        { label:'SoC',     data:[], borderColor:'#ffb300', backgroundColor:'rgba(255,179,0,0.05)',  borderWidth:1.5, pointRadius:0, tension:0.3 },
+      ]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins } }
+  });
+}
+
+function updateCharts(events) {
+  let auto=0, limited=0, escalated=0;
+  let confBuckets=[0,0,0,0,0];
+  // Count total unique injected faults for pending calculation
+  const injectedFaults = new Set(
+    events.filter(e => e.event_type === 'FAULT_INJECTED').map(e => e.data.type)
+  );
+  const decidedFaults = new Set(
+    events.filter(e => e.event_type === 'FAULT_ISOLATED').map(e => e.data.fault_type)
+  );
+  const pending = Math.max(0, injectedFaults.size - decidedFaults.size);
+
+  events.forEach(e => {
+    if (e.event_type === 'ETHICAL_DECISION') {
+      const d = e.data;
+      if (d.autonomy_level === 'FULL_AUTONOMOUS')  auto++;
+      if (d.autonomy_level === 'LIMITED_ACTION')   limited++;
+      if (d.autonomy_level === 'HUMAN_ESCALATION') escalated++;
+      // confidence histogram
+      const c = d.confidence || 0;
+      if (c < 0.55) confBuckets[0]++;
+      else if (c < 0.65) confBuckets[1]++;
+      else if (c < 0.75) confBuckets[2]++;
+      else if (c < 0.85) confBuckets[3]++;
+      else confBuckets[4]++;
+    }
+  });
+
+  chartInstances.bar.data.datasets[0].data = [auto, limited, escalated, pending];
+  chartInstances.bar.update('none');
+
+  chartInstances.pie.data.datasets[0].data = [auto, limited, escalated];
+  chartInstances.pie.update('none');
+
+  chartInstances.hist.data.datasets[0].data = confBuckets;
+  chartInstances.hist.update('none');
+}
+
+function updateLineChart(data) {
+  if (!data || !data.power) return;
+  const v = data.power.voltage;
+  const s = data.power.soc;
+  const tick = document.getElementById('ss-tick').textContent;
+
+  tickHistory.ticks.push(tick);
+  tickHistory.voltage.push(v != null ? +v.toFixed(2) : null);
+  tickHistory.soc.push(s != null ? +s.toFixed(2) : null);
+
+  if (tickHistory.ticks.length > MAX_HISTORY_POINTS) {
+    tickHistory.ticks.shift();
+    tickHistory.voltage.shift();
+    tickHistory.soc.shift();
+  }
+
+  chartInstances.line.data.labels = tickHistory.ticks;
+  chartInstances.line.data.datasets[0].data = tickHistory.voltage;
+  chartInstances.line.data.datasets[1].data  = tickHistory.soc;
+  // 'none' disables animation for smooth real-time feel
+  chartInstances.line.update('none');
+}
+
+// ── TELEMETRY UPDATE ──
+// Helper: set textContent only if value changed (avoids unnecessary text-node churn)
+function _setText(id, val) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== val) el.textContent = val;
+}
+function _setStyle(id, prop, val) {
+  const el = document.getElementById(id);
+  if (el && el.style[prop] !== val) el.style[prop] = val;
+}
+
+function updateTelemetry(subs) {
+  if (subs.power) {
+    const p = subs.power.sensor_data;
+    if (p && p.voltage !== undefined) {
+      const vPct = Math.min(100, (p.voltage / 75) * 100).toFixed(2) + '%';
+      const iPct = Math.min(100, (p.current / 80) * 100).toFixed(2) + '%';
+      const sPct = Math.min(100, p.soc).toFixed(2) + '%';
+      const tPct = Math.min(100, (p.temperature / 100) * 100).toFixed(2) + '%';
+      _setStyle('bar-v', 'width', vPct);
+      _setStyle('bar-i', 'width', iPct);
+      _setStyle('bar-s', 'width', sPct);
+      _setStyle('bar-t', 'width', tPct);
+      _setText('val-v', p.voltage.toFixed(1) + ' V');
+      _setText('val-i', p.current.toFixed(1) + ' A');
+      _setText('val-s', p.soc.toFixed(1) + ' %');
+      _setText('val-t', p.temperature.toFixed(1) + ' °C');
+      const vColor = p.voltage < 38 ? 'var(--danger)' : p.voltage < 50 ? 'var(--warn)' : 'var(--accent)';
+      const sColor = p.soc < 22 ? 'var(--danger)' : 'var(--warn)';
+      _setStyle('bar-v', 'background', vColor);
+      _setStyle('val-v', 'color', vColor);
+      _setStyle('bar-s', 'background', sColor);
+    }
+    const pStatus = subs.power.status || 'NOMINAL';
+    const pDotCls = 'status-dot ' + (pStatus === 'CRITICAL' ? 'dot-red' : pStatus === 'WARNING' ? 'dot-yellow' : 'dot-green');
+    _setText('ss-pwr', pStatus);
+    const pDot = document.getElementById('ss-pwr-dot');
+    if (pDot && pDot.className !== pDotCls) pDot.className = pDotCls;
+  }
+  if (subs.thermal) {
+    const th = subs.thermal.sensor_data;
+    if (th && th.internal_temp !== undefined) {
+      const itPct = Math.min(100, (th.internal_temp / 100) * 100).toFixed(2) + '%';
+      const rtPct = Math.min(100, (th.radiator_temp / 60) * 100).toFixed(2) + '%';
+      const hpPct = Math.min(100, th.heater_power).toFixed(2) + '%';
+      _setStyle('bar-it', 'width', itPct);
+      _setStyle('bar-rt', 'width', rtPct);
+      _setStyle('bar-hp', 'width', hpPct);
+      _setText('val-it', th.internal_temp.toFixed(1) + ' °C');
+      _setText('val-rt', th.radiator_temp.toFixed(1) + ' °C');
+      _setText('val-hp', th.heater_power.toFixed(1) + ' %');
+      const itColor = th.internal_temp > 72 ? 'var(--danger)' : th.internal_temp > 58 ? 'var(--warn)' : 'var(--accent)';
+      _setStyle('bar-it', 'background', itColor);
+      _setStyle('val-it', 'color', itColor);
+    }
+    const thStatus = subs.thermal.status || 'NOMINAL';
+    const thDotCls = 'status-dot ' + (thStatus === 'CRITICAL' ? 'dot-red' : thStatus === 'WARNING' ? 'dot-yellow' : 'dot-green');
+    _setText('ss-thr', thStatus);
+    const thDot = document.getElementById('ss-thr-dot');
+    if (thDot && thDot.className !== thDotCls) thDot.className = thDotCls;
+  }
+}
+
+// ── LOG UPDATE ──
+// ── LOG SCROLL LOCK ──
+// _logUserScrolled is set true when user scrolls up manually.
+// It is cleared when they scroll back to within 8px of the bottom.
+// Attach listener lazily on first use to avoid DOMContentLoaded timing issues.
+let _logListenerAttached = false;
+function _ensureLogListener() {
+  if (_logListenerAttached) return;
+  const lb = document.getElementById('log-body');
+  if (!lb) return;
+  _logListenerAttached = true;
+  lb.addEventListener('scroll', function() {
+    const atBottom = this.scrollHeight - this.scrollTop - this.clientHeight < 10;
+    _logUserScrolled = !atBottom;
+  }, { passive: true });
+}
+
+function _logEventMsg(e) {
+  const et = e.event_type;
+  let cls = 'log-nominal', msg = '';
+  if (et === 'FAULT_INJECTED') {
+    cls = 'log-inject';
+    msg = `💥 [${(e.data.subsystem||'').toUpperCase()}] FAULT INJECTED: ${(e.data.type||'').toUpperCase()}`;
+  } else if (et === 'ETHICAL_DECISION') {
+    const level = e.data.autonomy_level;
+    cls = level === 'FULL_AUTONOMOUS' ? 'log-autonomous' : level === 'LIMITED_ACTION' ? 'log-limited' : 'log-escalated';
+    const icon = level === 'FULL_AUTONOMOUS' ? '✅' : level === 'LIMITED_ACTION' ? '⚠️' : '🚨';
+    msg = `${icon} ${level} → ${e.data.permitted_action} (${((e.data.confidence||0)*100).toFixed(0)}% conf)`;
+  } else if (et === 'RECOVERY_ACTION') {
+    cls = 'log-recovery';
+    msg = `✅ RECOVERY: ${e.data.action_taken} — ${e.data.description}`;
+  } else if (et === 'HUMAN_ESCALATION') {
+    cls = 'log-escalated';
+    msg = `🚨 HUMAN ESCALATION — operator action required`;
+  } else if (et === 'HUMAN_APPROVAL') {
+    cls = 'log-autonomous';
+    msg = `👤 OPERATOR APPROVED: ${e.data.fault_type} → ${e.data.approved_action}`;
+  } else if (et === 'ANOMALY_DETECTED') {
+    cls = 'log-limited';
+    msg = `⚠ ANOMALY: [${(e.data.subsystem||'').toUpperCase()}] ${e.data.overall_status} — ${(e.data.confirmed_anomalies||[]).join(', ')}`;
+  } else if (et === 'TEMPORARY_ANOMALY') {
+    cls = 'log-temp';
+    msg = `~ TEMP: [${(e.data.subsystem||'').toUpperCase()}] monitoring ${(e.data.temporary_anomalies||[]).join(', ')}`;
+  } else if (et === 'SYSTEM_NOMINAL') {
+    msg = `✓ System nominal`;
+  } else if (et === 'FAULT_ISOLATED') {
+    cls = 'log-recovery';
+    msg = `🔍 ISOLATED: ${(e.data.fault_type||'').toUpperCase()} conf=${((e.data.confidence||0)*100).toFixed(0)}%`;
+  } else if (et === 'SYSTEM_RESET') {
+    cls = 'log-inject';
+    msg = `⟳ SYSTEM RESET`;
+  } else if (et === 'SYSTEM_START') {
+    msg = `▶ FDIR ONLINE — ${e.data.mission_phase}`;
+  } else if (et === 'SAFE_MODE') {
+    cls = 'log-escalated';
+    msg = `🛡 SAFE MODE: ${e.data.reason}`;
+  }
+  return { cls, msg };
+}
+
+function updateLog(events) {
+  _ensureLogListener();
+  const logBody = document.getElementById('log-body');
+
+  // First time — clear the static placeholder HTML
+  if (eventHistory.length === 0 && events.length > 0) {
+    logBody.innerHTML = '';
+  }
+
+  // Only process events we haven't seen yet
+  const newEvents = events.slice(eventHistory.length);
+  if (newEvents.length === 0) return;
+  eventHistory = events;
+
+  // Build a document fragment — one single DOM insertion, no per-row reflow
+  const frag = document.createDocumentFragment();
+  let added = 0;
+  newEvents.forEach(e => {
+    const { cls, msg } = _logEventMsg(e);
+    if (!msg) return;
+    const div = document.createElement('div');
+    div.className = 'log-line ' + cls;
+    const tick = String(e.tick).padStart(3,'0');
+    const tickSpan = document.createElement('span');
+    tickSpan.className = 'log-tick';
+    tickSpan.textContent = 'T' + tick;
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'log-msg';
+    msgSpan.textContent = msg;  // textContent not innerHTML — no XSS, no HTML parsing
+    div.appendChild(tickSpan);
+    div.appendChild(msgSpan);
+    frag.appendChild(div);
+    added++;
+  });
+
+  if (added === 0) return;
+  logBody.appendChild(frag);  // single reflow for all new rows
+
+  // Scroll to bottom only if user hasn't manually scrolled up
+  if (!_logUserScrolled) {
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+  document.getElementById('log-count').textContent = eventHistory.length + ' EVENTS';
+}
+
+// ── HISTORY TABLE UPDATE ──
+// DOM-diffing: never wipe — only insert new rows or patch changed status cells
+const _historyRendered = new Set();
+const _historyRowMap = new Map();   // key → <tr> element, for O(1) lookup without CSS.escape
+
+function updateHistory(events) {
+  const decisions = events.filter(e => e.event_type === 'ETHICAL_DECISION');
+  if (decisions.length === 0) return;
+
+  const recoveries = {};
+  events.filter(e => e.event_type === 'RECOVERY_ACTION').forEach(e => {
+    recoveries[e.tick] = e.data;
+  });
+
+  const tbody = document.getElementById('history-tbody');
+  const placeholder = tbody.querySelector('td[colspan]');
+  if (placeholder) tbody.innerHTML = '';
+
+  let addedAny = false;
+
+  decisions.forEach(e => {
+    const d = e.data;
+    const key = `${e.tick}:${d.subsystem||""}:${d.autonomy_level||""}:${d.permitted_action||""}`;
+    const level  = d.autonomy_level;
+    const rec    = recoveries[e.tick];
+    const statusHTML = level === 'HUMAN_ESCALATION'
+      ? '<span style="color:var(--danger)">AWAITING GROUND</span>'
+      : rec ? '<span style="color:var(--accent2)">RESOLVED</span>'
+            : '<span style="color:var(--warn)">IN PROGRESS</span>';
+
+    if (!_historyRendered.has(key)) {
+      _historyRendered.add(key);
+      const cls  = level === 'FULL_AUTONOMOUS' ? 'hist-auto' : level === 'LIMITED_ACTION' ? 'hist-limited' : 'hist-esc';
+      const icon = level === 'FULL_AUTONOMOUS' ? '✅' : level === 'LIMITED_ACTION' ? '⚠️' : '🚨';
+      const action = d.permitted_action !== 'none' ? d.permitted_action : '—';
+      const tr = document.createElement('tr');
+      tr.dataset.key = key;
+      tr.innerHTML =
+        `<td>T${String(e.tick).padStart(3,'0')}</td>` +
+        `<td>${(d.subsystem||'—').toUpperCase()}</td>` +
+        `<td>${(d.fault_type || d.permitted_action || '—').toUpperCase()}</td>` +
+        `<td>${((d.confidence||0)*100).toFixed(0)}%</td>` +
+        `<td>${d.risk_level||'—'}</td>` +
+        `<td class="${cls}">${icon} ${level}</td>` +
+        `<td>${action}</td>` +
+        `<td class="status-cell">${statusHTML}</td>`;
+      tbody.insertBefore(tr, tbody.firstChild);
+      _historyRowMap.set(key, tr);
+      addedAny = true;
+    } else {
+      // Row exists — only patch status cell if it changed (e.g. IN PROGRESS → RESOLVED)
+      const tr = _historyRowMap.get(key);
+      if (tr) {
+        const cell = tr.querySelector('.status-cell');
+        if (cell && cell.innerHTML !== statusHTML) cell.innerHTML = statusHTML;
+      }
+    }
+  });
+
+  if (addedAny) {
+    document.getElementById('hist-count').textContent = _historyRendered.size + ' EVENTS';
+  }
+}
+
+// ── FAULT CARD UPDATE ──
+const faultMap = {
+  'voltage_drop':    { card:'fc1', label:'Fault 1 — Power',   name:'VOLTAGE DROP' },
+  'heater_failure':  { card:'fc2', label:'Fault 2 — Thermal', name:'HEATER FAILURE' },
+  'overcurrent':     { card:'fc3', label:'Fault 3 — Power',   name:'OVERCURRENT' },
+  'battery_drain':   { card:'fc4', label:'Fault 4 — Power',   name:'BATTERY DRAIN' },
+  'thermal_runaway': { card:'fc5', label:'Fault 5 — Thermal', name:'THERMAL RUNAWAY' },
+};
+
+// Tracks last-rendered state per fault card to avoid unnecessary DOM writes
+const _cardState = {};
+
+function updateFaultCards(events) {
+  const injected = new Set();
+  events.forEach(e => {
+    if (e.event_type === 'FAULT_INJECTED') injected.add(e.data.type);
+  });
+  const isolated = {};
+  events.filter(e => e.event_type === 'FAULT_ISOLATED').forEach(e => {
+    isolated[e.data.fault_type] = e.data;
+  });
+
+  let activeFaults = 0;
+  Object.entries(faultMap).forEach(([ft, info]) => {
+    const card = document.getElementById(info.card);
+    const statusEl = card.querySelector('.fc-status');
+    const isInjected = injected.has(ft);
+    const diag = isolated[ft];
+
+    let newCardClass, newStatusClass, newStatusText;
+
+    if (!isInjected) {
+      newCardClass = 'fault-card inactive';
+      newStatusClass = 'fc-status col-pending';
+      newStatusText = '⏳ PENDING';
+    } else if (!diag) {
+      activeFaults++;
+      newCardClass = 'fault-card inactive';
+      newStatusClass = 'fc-status col-pending';
+      newStatusText = '📡 INJECTED — detecting...';
+    } else {
+      // Find matching ethical decision near isolation tick
+      const isoTick = events.find(ei => ei.event_type === 'FAULT_ISOLATED' && ei.data.fault_type === ft)?.tick || 0;
+      const ethEvent = events.find(e =>
+        e.event_type === 'ETHICAL_DECISION' && Math.abs(e.tick - isoTick) <= 2
+      );
+      if (!ethEvent) return;
+      const level  = ethEvent.data.autonomy_level;
+      const action = ethEvent.data.permitted_action;
+      if (level === 'FULL_AUTONOMOUS') {
+        newCardClass = 'fault-card autonomous';
+        newStatusClass = 'fc-status col-auto';
+        newStatusText = `✅ FULL_AUTONOMOUS — ${action}`;
+        // resolved — don't count as active
+      } else if (level === 'LIMITED_ACTION') {
+        activeFaults++;
+        newCardClass = 'fault-card limited';
+        newStatusClass = 'fc-status col-limited';
+        newStatusText = `⚠️ LIMITED — ${action} applied, awaiting ground`;
+      } else {
+        activeFaults++;
+        newCardClass = 'fault-card escalated';
+        newStatusClass = 'fc-status col-esc';
+        newStatusText = '🚨 ESCALATED TO GROUND STATION';
+      }
+    }
+
+    // Only write to DOM if something actually changed
+    const prev = _cardState[ft] || {};
+    if (prev.cardClass !== newCardClass) { card.className = newCardClass; }
+    if (prev.statusClass !== newStatusClass) { statusEl.className = newStatusClass; }
+    if (prev.statusText !== newStatusText) { statusEl.textContent = newStatusText; }
+    _cardState[ft] = { cardClass: newCardClass, statusClass: newStatusClass, statusText: newStatusText };
+  });
+
+  const countEl = document.getElementById('active-fault-count');
+  const newCount = activeFaults + ' ACTIVE FAULTS';
+  if (countEl.textContent !== newCount) countEl.textContent = newCount;
+}
+
+// ── API CALLS ──
+// ── UNIFIED POLL — sequential, no overlap, with reconnection logic ──
+let _polling = false;
+
+async function poll() {
+  if (_polling) return;
+  _polling = true;
+  try {
+    // STATUS
+    const sr = await fetch(`${API}/status`, { signal: AbortSignal.timeout(3000) });
+    if (sr.ok) {
+      const state = await sr.json();
+
+      // If we were offline, announce reconnection
+      if (!_backendOnline) {
+        _backendOnline = true;
+        _reconnectAttempts = 0;
+        document.getElementById('ss-fdir').textContent = 'ONLINE';
+        showToast('✅ Reconnected to FDIR backend', 'success');
+        // Clear all stale demo/offline content
+        eventHistory = [];
+        _logUserScrolled = false;
+        document.getElementById('log-body').innerHTML = '';
+        tickHistory = { voltage:[], current:[], soc:[], temp:[], ticks:[] };
+      }
+
+      // Tick
+      const tick = state.tick || 0;
+      document.getElementById('ss-tick').textContent = 'T' + String(tick).padStart(3,'0');
+
+      // Mission phase — highlight active phase button
+      const phase = state.mission_phase || 'NOMINAL_OPS';
+      document.getElementById('ss-phase').textContent = phase;
+      setActivePhaseBtn(phase);
+      const phaseDot = document.getElementById('ss-phase-dot');
+      phaseDot.className = 'status-dot ' + (
+        phase === 'CRITICAL_MANEUVER' || phase === 'SAFE_MODE' ? 'dot-red' :
+        phase === 'COMMS_BLACKOUT' ? 'dot-yellow' : 'dot-blue'
+      );
+
+      // Safe mode indicator
+      if (state.safe_mode_active) {
+        document.getElementById('ss-fdir').textContent = 'SAFE MODE';
+        document.getElementById('ss-fdir').style.color = 'var(--danger)';
+      } else {
+        document.getElementById('ss-fdir').style.color = '';
+      }
+
+      // Subsystems
+      if (state.subsystems) {
+        updateTelemetry(state.subsystems);
+        const pdata = state.subsystems.power && state.subsystems.power.sensor_data;
+        if (pdata && pdata.voltage != null) updateLineChart({ power: pdata });
+      }
+
+      // Dynamic approval buttons from live state
+      updateApprovalSection(state.human_hold_faults || []);
+
+      // Human alerts
+      if (state.human_alert && state.human_alert !== _lastAlert) {
+        _lastAlert = state.human_alert;
+        showToast('🚨 ' + state.human_alert.slice(0,60), 'danger');
+      }
+    }
+
+    // EVENTS
+    const er = await fetch(`${API}/events`, { signal: AbortSignal.timeout(3000) });
+    if (er.ok) {
+      const events = await er.json();
+      if (Array.isArray(events)) {
+        updateLog(events);
+        updateCharts(events);
+        updateHistory(events);
+        updateFaultCards(events);
+      }
+    }
+
+  } catch(e) {
+    // Backend went offline — trigger reconnect logic
+    if (_backendOnline) {
+      _backendOnline = false;
+      document.getElementById('ss-fdir').textContent = 'RECONNECTING...';
+      document.getElementById('ss-fdir').style.color = 'var(--warn)';
+      showToast('⚠ Backend connection lost — retrying...', 'warn');
+    }
+    _reconnectAttempts++;
+    // Exponential backoff: slow down polling if backend stays offline
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      const delay = Math.min(2000 * Math.pow(1.5, Math.min(_reconnectAttempts, 6)), 30000);
+      pollInterval = setInterval(poll, delay);
+    }
+    console.warn('Poll error:', e.message, `(attempt ${_reconnectAttempts})`);
+  } finally {
+    _polling = false;
+  }
+}
+
+let _lastAlert = '';
+
+// kept for backward compat
+async function fetchEvents() { await poll(); }
+async function fetchStatus() { await poll(); }
+
+async function sendApproval(faultType) {
+  try {
+    const r = await fetch(`${API}/human-approve`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fault_type: faultType, approved_action: 'operator_decision' })
+    });
+    if (r.ok) {
+      showToast(`✅ Approved: ${faultType}`, 'success');
+      addCommandToHistory('APPROVAL', faultType, 'HUMAN_APPROVED');
+    } else {
+      const err = await r.json();
+      showToast(`⚠ ${err.detail || 'Approval failed'}`, 'warn');
+    }
+  } catch(e) {
+    showToast('⚠ Backend offline — cannot approve', 'warn');
+  }
+}
+
+async function sendPhaseChange(phase) {
+  try {
+    const r = await fetch(`${API}/mission-phase`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ phase })
+    });
+    if (r.ok) {
+      showToast(`Phase → ${phase}`, 'success');
+      document.getElementById('ss-phase').textContent = phase;
+      setActivePhaseBtn(phase);
+      addCommandToHistory('PHASE_CHANGE', phase, 'APPLIED');
+    } else {
+      showToast('Phase change failed', 'warn');
+    }
+  } catch(e) {
+    showToast('⚠ Backend offline', 'warn');
+  }
+}
+
+function setActivePhaseBtn(phase) {
+  document.querySelectorAll('.phase-btn').forEach(b => b.classList.remove('active-phase'));
+  const btn = document.getElementById('pb-' + phase);
+  if (btn) btn.classList.add('active-phase');
+}
+
+// Legacy wrapper kept in case called from elsewhere
+async function injectFault(subsystem, type) {
+  await _doInject(subsystem, type, 'gradual', 30.0);
+}
+
+async function _doInject(subsystem, type, severity, target_value) {
+  try {
+    const r = await fetch(`${API}/inject-fault`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ subsystem, type, severity, target_value,
+        description: `Ground command injection — ${type} (${severity})` })
+    });
+    if (r.ok) {
+      showToast(`💥 Injected: ${type} [${severity}]`, 'danger');
+      addCommandToHistory('INJECT', `${subsystem}/${type}`, 'QUEUED');
+    } else {
+      const err = await r.json();
+      showToast(`⚠ ${err.detail || 'Injection failed'}`, 'warn');
+    }
+  } catch(e) {
+    showToast('⚠ Backend offline', 'warn');
+  }
+}
+
+async function sendReset() {
+  if (!confirm('Reset all subsystems to nominal state?')) return;
+  try {
+    const r = await fetch(`${API}/reset`, { method:'POST' });
+    if (r.ok) {
+      showToast('⟳ System reset queued', 'success');
+      // Clear local history so we don't replay stale events
+      eventHistory = [];
+      tickHistory = { voltage:[], current:[], soc:[], temp:[], ticks:[] };
+      tickHistory.voltage = []; tickHistory.current = [];
+      tickHistory.soc = []; tickHistory.temp = []; tickHistory.ticks = [];
+      chartInstances.line.data.labels = [];
+      chartInstances.line.data.datasets.forEach(d => d.data = []);
+      chartInstances.line.update('none');
+      document.getElementById('log-body').innerHTML = '';
+      _logUserScrolled = false;
+      document.getElementById('history-tbody').innerHTML =
+        '<tr><td colspan="8" style="color:var(--text-dim);text-align:center;padding:16px">System reset — awaiting new events...</td></tr>';
+      _historyRendered.clear();
+      _historyRowMap.clear();
+      _lastHoldFaults = [];
+      updateApprovalSection([]);
+      addCommandToHistory('RESET', 'ALL SUBSYSTEMS', 'QUEUED');
+    }
+  } catch(e) {
+    showToast('⚠ Backend offline', 'warn');
+  }
+}
+
+function addCommandToHistory(type, target, status) {
+  const now = new Date().toLocaleTimeString();
+  const tbody = document.getElementById('history-tbody');
+  // Remove the "awaiting" placeholder if present
+  const placeholder = tbody.querySelector('td[colspan]');
+  if (placeholder) tbody.innerHTML = '';
+  const cls = type === 'APPROVAL' ? 'hist-auto' : type === 'INJECT' ? 'hist-esc' : 'hist-limited';
+  const newRow = document.createElement('tr');
+  newRow.innerHTML = `
+    <td>—</td>
+    <td>—</td>
+    <td>${target}</td>
+    <td>—</td>
+    <td>—</td>
+    <td class="${cls}">👤 ${type}</td>
+    <td>—</td>
+    <td><span style="color:var(--accent2)">${status}</span></td>
+  `;
+  tbody.insertBefore(newRow, tbody.firstChild);
+  document.getElementById('hist-count').textContent = (tbody.querySelectorAll('tr').length) + ' COMMANDS';
+}
+
+// ── DEMO MODE (when backend offline) ──
+function runDemoMode() {
+  const demoEvents = [
+    {tick:0,  event_type:'SYSTEM_START',   data:{mission_phase:'NOMINAL_OPS',subsystems:['power','thermal']}},
+    {tick:10, event_type:'FAULT_INJECTED', data:{type:'voltage_drop',subsystem:'power',description:'Primary regulator failure'}},
+    {tick:14, event_type:'FAULT_ISOLATED', data:{fault_type:'voltage_drop',confidence:0.78,risk_level:'LOW',reversibility:'HIGH'}},
+    {tick:14, event_type:'ETHICAL_DECISION',data:{autonomy_level:'FULL_AUTONOMOUS',permitted_action:'switch_to_backup_regulator',confidence:0.78,risk_level:'LOW',mission_phase:'NOMINAL_OPS',mission_criticality:'LOW',subsystem:'power'}},
+    {tick:14, event_type:'RECOVERY_ACTION', data:{action_taken:'switch_to_backup_regulator',description:'Switched to backup regulator',side_effects:[],subsystem:'power'}},
+    {tick:25, event_type:'FAULT_INJECTED', data:{type:'heater_failure',subsystem:'thermal',description:'Primary heater degrading'}},
+    {tick:33, event_type:'FAULT_ISOLATED', data:{fault_type:'heater_failure',confidence:0.88,risk_level:'LOW',reversibility:'HIGH'}},
+    {tick:33, event_type:'ETHICAL_DECISION',data:{autonomy_level:'FULL_AUTONOMOUS',permitted_action:'switch_to_backup_heater',confidence:0.88,risk_level:'LOW',mission_phase:'NOMINAL_OPS',mission_criticality:'LOW',subsystem:'thermal'}},
+    {tick:33, event_type:'RECOVERY_ACTION', data:{action_taken:'switch_to_backup_heater',description:'Backup heater activated',side_effects:[],subsystem:'thermal'}},
+    {tick:45, event_type:'FAULT_INJECTED', data:{type:'overcurrent',subsystem:'power',description:'Excess current on primary bus'}},
+    {tick:52, event_type:'FAULT_ISOLATED', data:{fault_type:'overcurrent',confidence:0.65,risk_level:'MEDIUM',reversibility:'HIGH'}},
+    {tick:52, event_type:'ETHICAL_DECISION',data:{autonomy_level:'LIMITED_ACTION',permitted_action:'reduce_load',confidence:0.65,risk_level:'MEDIUM',mission_phase:'NOMINAL_OPS',mission_criticality:'LOW',subsystem:'power'}},
+    {tick:52, event_type:'RECOVERY_ACTION', data:{action_taken:'reduce_load',description:'Non-critical loads reduced',side_effects:['Payload suspended'],subsystem:'power'}},
+    {tick:50, event_type:'FAULT_INJECTED', data:{type:'battery_drain',subsystem:'power',description:'Abnormal battery depletion'}},
+    {tick:77, event_type:'FAULT_ISOLATED', data:{fault_type:'battery_drain',confidence:0.55,risk_level:'HIGH',reversibility:'MEDIUM'}},
+    {tick:77, event_type:'ETHICAL_DECISION',data:{autonomy_level:'HUMAN_ESCALATION',permitted_action:'none',confidence:0.55,risk_level:'HIGH',mission_phase:'NOMINAL_OPS',mission_criticality:'LOW',subsystem:'power'}},
+    {tick:77, event_type:'HUMAN_ESCALATION',data:{message:'OPERATOR ACTION REQUIRED — battery_drain HIGH risk'}},
+    {tick:95, event_type:'FAULT_INJECTED', data:{type:'thermal_runaway',subsystem:'thermal',description:'Component bay overheating'}},
+    {tick:101,event_type:'FAULT_ISOLATED', data:{fault_type:'thermal_runaway',confidence:0.70,risk_level:'HIGH',reversibility:'MEDIUM'}},
+    {tick:101,event_type:'ETHICAL_DECISION',data:{autonomy_level:'HUMAN_ESCALATION',permitted_action:'none',confidence:0.70,risk_level:'HIGH',mission_phase:'NOMINAL_OPS',mission_criticality:'LOW',subsystem:'thermal'}},
+    {tick:101,event_type:'HUMAN_ESCALATION',data:{message:'OPERATOR ACTION REQUIRED — thermal_runaway HIGH risk'}},
+  ];
+
+  let i=0;
+  function playNext() {
+    if (i >= demoEvents.length) return;
+    const batch = demoEvents.slice(0, ++i);
+    updateLog(batch);
+    updateCharts(batch);
+    updateHistory(batch);
+    updateFaultCards(batch);
+
+    // Simulate sensor data
+    const tick = demoEvents[i-1].tick;
+    document.getElementById('ss-tick').textContent = 'T'+String(tick).padStart(3,'0');
+
+    setTimeout(playNext, 1200);
+  }
+  playNext();
+}
+
+// ── INIT ──
+window.addEventListener('load', async () => {
+  initCharts();
+
+  // Try to connect to backend — retry up to 5 times before falling back to demo
+  let backendOnline = false;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const r = await fetch(`${API}/ping`, { signal: AbortSignal.timeout(2500) });
+      if (r.ok) { backendOnline = true; break; }
+    } catch(e) {
+      if (attempt < 5) {
+        // Brief wait before retry (gives main.py a moment to finish startup)
+        await new Promise(res => setTimeout(res, 600 * attempt));
+      }
+    }
+  }
+
+  if (backendOnline) {
+    _backendOnline = true;
+    showToast('✅ Connected to FDIR backend', 'success');
+    document.getElementById('ss-fdir').textContent = 'ONLINE';
+    await poll();                                 // immediate first poll
+    pollInterval = setInterval(poll, 2000);       // then every 2 s
+  } else {
+    showToast('⚠ Backend offline — demo mode active', 'warn');
+    document.getElementById('ss-fdir').textContent = 'DEMO MODE';
+    runDemoMode();
+    // Keep trying to reconnect in background — will switch to live when ready
+    pollInterval = setInterval(poll, 5000);
+  }
+});
+</script>
+</body>
+</html>
