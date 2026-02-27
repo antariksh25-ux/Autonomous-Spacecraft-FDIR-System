@@ -82,7 +82,15 @@ reset_signal = threading.Event()
 
 _ethical_engine = None
 _logger = None
+_recovery = None
+_subs = None
 _current_tick = [0]
+
+# ─────────────────────────────────────────────
+# HUMAN COMMAND QUEUE  (dashboard → FDIR loop)
+# ─────────────────────────────────────────────
+# Each item: {"action": str, "subsystem": str, "fault_type": str, ...}
+human_command_queue = queue.Queue()
 
 
 STATUS_PRIORITY = [HealthStatus.CRITICAL, HealthStatus.WARNING,
@@ -109,12 +117,122 @@ def build_state_snapshot(all_sensor_data: dict, all_health: dict) -> dict:
     }
 
 
+def _process_human_command(cmd, subs, ethical, recovery, logger, tick):
+    """
+    Process a command sent by the human operator through the dashboard.
+
+    Supported commands:
+      approve_and_execute — clear human hold, execute recovery action
+      force_action        — directly execute a recovery action on a subsystem
+      annotate            — add an operator note to the event log
+      exit_safe_mode      — attempt to exit safe mode
+    """
+    action = cmd.get("command", "")
+
+    if action == "approve_and_execute":
+        fault_type  = cmd.get("fault_type", "")
+        subsystem   = cmd.get("subsystem", "")
+        chosen_act  = cmd.get("action", "")
+
+        # Clear the human hold
+        ethical.clear_human_hold(fault_type)
+
+        # Log the approval
+        logger.log_human_approval(tick, fault_type, chosen_act)
+
+        # Build a synthetic ethical decision to authorize the action
+        from ethical_engine import EthicalDecisionResult
+        synthetic = EthicalDecisionResult(
+            subsystem=subsystem,
+            autonomy_level="FULL_AUTONOMOUS",
+            permitted_action=chosen_act,
+            confidence=1.0,
+            risk_level="LOW",
+            reversibility="HIGH",
+            mission_criticality=cfg.MISSION_PHASE_CRITICALITY.get(cfg.MISSION_PHASE, "LOW"),
+            mission_phase=cfg.MISSION_PHASE,
+            reasoning=f"HUMAN OPERATOR APPROVED — Action '{chosen_act}' authorized by ground station.",
+            human_message="",
+            requires_human_hold=False,
+        )
+
+        # Execute recovery
+        result = recovery.execute(synthetic, subsystem)
+        recovery_dict = recovery.to_dict(result)
+        logger.log_recovery(tick, subsystem, recovery_dict, {})
+
+        # Mark fault as handled in the subsystem
+        sub = subs.get(subsystem)
+        if sub:
+            sub["handled_faults"].add(fault_type)
+            sub["recovery_counters"][fault_type] = 0
+
+        # Update shared state
+        with state_lock:
+            system_state["last_recovery"]    = recovery_dict
+            system_state["recovery_active"]   = True
+            system_state["safe_mode_active"]  = recovery.safe_mode_active
+            system_state["human_alert"]       = None
+            system_state["human_hold_faults"] = list(ethical.human_hold_faults)
+            # Remove from active faults
+            key = f"{subsystem}:{fault_type}"
+            if key in system_state["active_faults"]:
+                system_state["active_faults"].remove(key)
+
+    elif action == "force_action":
+        subsystem  = cmd.get("subsystem", "")
+        chosen_act = cmd.get("action", "")
+
+        from ethical_engine import EthicalDecisionResult
+        synthetic = EthicalDecisionResult(
+            subsystem=subsystem,
+            autonomy_level="FULL_AUTONOMOUS",
+            permitted_action=chosen_act,
+            confidence=1.0,
+            risk_level="LOW",
+            reversibility="HIGH",
+            mission_criticality="LOW",
+            mission_phase=cfg.MISSION_PHASE,
+            reasoning=f"GROUND STATION OVERRIDE — '{chosen_act}' forced by operator.",
+            human_message="",
+            requires_human_hold=False,
+        )
+        result = recovery.execute(synthetic, subsystem)
+        logger.log_recovery(tick, subsystem, recovery.to_dict(result), {})
+
+        with state_lock:
+            system_state["last_recovery"]   = recovery.to_dict(result)
+            system_state["recovery_active"]  = True
+            system_state["safe_mode_active"] = recovery.safe_mode_active
+
+    elif action == "annotate":
+        note = cmd.get("note", "")
+        logger._add_event("OPERATOR_NOTE", {
+            "subsystem": "ground_station",
+            "note": note,
+        }, tick=tick)
+        print(f"\033[95m[T{tick:03d}] \U0001f464 OPERATOR NOTE: {note}\033[0m")
+
+    elif action == "exit_safe_mode":
+        recovery.safe_mode_active = False
+        recovery.is_recovering = False
+        for sim in recovery.simulators.values():
+            sim.safe_mode = False
+        with state_lock:
+            system_state["safe_mode_active"] = False
+        logger._add_event("SAFE_MODE_EXIT", {
+            "subsystem": "ground_station",
+            "note": "Safe mode exited by operator command",
+        }, tick=tick)
+        print(f"\033[92m[T{tick:03d}] SAFE MODE EXITED by operator command\033[0m")
+
+
 # ─────────────────────────────────────────────
 # FDIR PIPELINE LOOP
 # ─────────────────────────────────────────────
 
 def run_fdir_scenario():
-    global _ethical_engine, _logger
+    global _ethical_engine, _logger, _recovery, _subs
 
     # ── Initialize subsystem components ──────────────────────────
     power_sim   = PowerSubsystemSimulator()
@@ -138,6 +256,7 @@ def run_fdir_scenario():
 
     _ethical_engine = ethical
     _logger = logger
+    _recovery = recovery
 
     # ── Bundle subsystems for iteration ─────────────────────────
     subs = {
@@ -160,6 +279,8 @@ def run_fdir_scenario():
             "health":   {},
         },
     }
+
+    _subs = subs
 
     safe_mode_triggered = False
     nominal_reported    = False
@@ -212,6 +333,16 @@ def run_fdir_scenario():
         time.sleep(cfg.TICK_INTERVAL_SECONDS)
 
         try:   # §10.3: Exception handling — loop never crashes demo
+
+            # ══════════════════════════════════════════════════════
+            # STEP 0:  HUMAN COMMAND PROCESSING
+            # ══════════════════════════════════════════════════════
+            while not human_command_queue.empty():
+                try:
+                    cmd = human_command_queue.get_nowait()
+                    _process_human_command(cmd, subs, ethical, recovery, logger, tick)
+                except queue.Empty:
+                    break
 
             # ══════════════════════════════════════════════════════
             # STEP 1:  FAULT INJECTION (timeline + API, all subs)
